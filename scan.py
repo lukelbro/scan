@@ -10,16 +10,18 @@ from functools import cache, singledispatch
 class Scan:
     """Data Structure object for H5 scan files from the E11 lab."""
     filename: str
-    power: float = 0
-    efield: int = 0
-    detuning: float = 0
-    scanfreq: float = 0
+
+    experiment: str = 'generic'
+    power: float = None
+    efield: int = None
+    detuning: float = None
+    scanfreq: float = None
     scantype: str = 'default'
 
-    freq: np.ndarray = np.array([0]) # Array of frequencies from h5 file
-    data: np.ndarray = np.array([0]) # Array of data point from h5 file
+    x: np.ndarray = np.array([0]) # Array of frequencies from h5 file
+    y: np.ndarray = np.array([0]) # Array of data point from h5 file
     error: np.ndarray = np.array([0])
-    baseValue: float = 0
+    baseValue: float = None
 
     def __post_init__(self):
         # Load data from hdf5 file
@@ -31,6 +33,7 @@ class Scan:
             
         # Load data into Pandas data frame
         df = pd.DataFrame.from_records(dset, columns=dset.dtype.fields.keys())
+
         # Generate signal data from windows
         df['signal'] =  -(df['a0'] - df['a1'])/((df['a0'] - df['a1']) + (df['a0'] - df['a2']))
         df['error'] = np.sqrt(np.abs(df['signal']) * (1 - np.abs(df['signal']))/100)
@@ -57,23 +60,23 @@ class Scan:
         else:
             raise ValueError(f'Scan type {self.scantype} is not recognised')
 
-        self.data = np.array((dfmean['signal'] - self.baseValue).to_list())
-        self.freq = np.array(dfmean['signal'].keys().to_list())
+        self.y = np.array((dfmean['signal'] - self.baseValue).to_list())
+        self.x = np.array(dfmean['signal'].keys().to_list())
         self.error = np.array(dfmean['error_final'].to_list())
-        self._freq_orignal = self.freq.copy()
-        self._data_orignal = self.data.copy()
+        self._x_orignal = self.x.copy()
+        self._y_orignal = self.y.copy()
         self._error_orignal = self.error.copy()
 
         self.gauss = Gauss(self)
         self.rabi = Rabi(self)
     
     def set_range(self, range):
-        "Select subset of data based on values of freq"
+        "Select subset of y based on values of x"
         start = range[0]
         end = range[1]
 
-        self.freq = self._freq_orignal.copy()[start:end]
-        self.data = self._data_orignal.copy()[start:end]
+        self.x = self._x_orignal.copy()[start:end]
+        self.y = self._y_orignal.copy()[start:end]
         self.error = self._error_orignal.copy()[start:end]
 
 
@@ -118,12 +121,12 @@ class abstract_fitting:
         scan = self.scan
         p = self.guess
         if len(self.sigma) >  0:
-            self._p0, self._varMatrix = curve_fit(self.func, scan.freq, scan.data, p0=p, absolute_sigma=True, sigma=scan.error)
+            self._p0, self._varMatrix = curve_fit(self.func, scan.x, scan.y, p0=p, absolute_sigma=True, sigma=scan.error)
         else:
             if self.bounds == 0:
-                self._p0, self._varMatrix = curve_fit(self.func, scan.freq, scan.data, p0=p, absolute_sigma=False)
+                self._p0, self._varMatrix = curve_fit(self.func, scan.x, scan.y, p0=p, absolute_sigma=False)
             else:
-                self._p0, self._varMatrix = curve_fit(self.func, scan.freq, scan.data, p0=p, bounds=self.bounds, absolute_sigma=False)  
+                self._p0, self._varMatrix = curve_fit(self.func, scan.x, scan.y, p0=p, bounds=self.bounds, absolute_sigma=False)  
     def p0(self):
         self.fit()
         return self._p0
@@ -136,7 +139,7 @@ class abstract_fitting:
 class Gauss(abstract_fitting):
     def __init__(self, scan):
         super().__init__()
-        self.guess = [np.max(scan.freq), scan.freq[np.argmax(scan.data)], 0.0001]
+        self.guess = [np.max(scan.x), scan.x[np.argmax(scan.y)], 0.0001]
         self.scan = scan
 
     @staticmethod
@@ -156,8 +159,8 @@ class Rabi(abstract_fitting):
     
     def fft_guess(self):
         '''Fit sin to the input time sequence, and return fitting parameters "amp", "omega", "phase", "offset", "freq", "period" and "fitfunc"'''
-        tt = self.scan.freq
-        yy = self.scan.data
+        tt = self.scan.x
+        yy = self.scan.y
         ff = np.fft.fftfreq(len(tt), (tt[1]-tt[0]))   # assume uniform spacing
         Fyy = abs(np.fft.fft(yy))
         guess_freq = abs(ff[np.argmax(Fyy[1:])+1])   # excluding the zero frequency "peak", which is related to offset
