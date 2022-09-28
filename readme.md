@@ -1,8 +1,20 @@
 # Scan Data Object
-My personal library for working with data from the E11 lab. The data format used in the lab is HDF5. All the data from an experiment is included in this file, including metadata. The files can be read for analysis using the [h5py](https://www.h5py.org) library.
+My personal library for working with data from the E11 lab. The data format used in the lab is HDF5. All the data from an experiment is included in this file, including metadata. The files can be read for analysis using the [h5py](https://www.h5py.org) library. A reference section can be found below that outlines the structure of these files.
+
+How to use Scan object
+- load data
+- chose function
+- change windows
+- change function
+- plot scans with window locations (interactive?)
+
+Experiment Types
+- Microwave: Baseline processing (first 10 values)
+- Generic: Baseline processing
 
 
-## File structure
+Fitting functions
+##  Reference: File structure
 A file can be loaded using 
 ```
 f = h5py.File('FILENAME', 'r')
@@ -65,7 +77,9 @@ This contains the time of arrival data stored on the oscilloscope. The metadata 
 The individual scans can be loaded into a dataframe using:
 ```
 pd.DataFrame.from_records(f['osc_0'])
-``` 
+```
+
+
 
 
 
