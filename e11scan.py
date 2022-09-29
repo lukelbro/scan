@@ -10,7 +10,7 @@ from  colorama import Fore
 from matplotlib import pyplot as plt
 
 @dataclass
-class Scan:
+class scan:
     """Data Structure object for H5 scan files from the E11 lab."""
     filename: str
     function: str
@@ -75,7 +75,7 @@ class Scan:
 
     def evaluate_windows(self):
         # convert input string i.e a0 + a1 into something python can evaluate
-        functionString = Scan.function_parser(self.function)
+        functionString = scan.function_parser(self.function)
         # evaluate windows
         self.df['signal'] = eval(functionString)
 
@@ -149,13 +149,13 @@ class Scan:
         end = range[1]
         self.x = self._x_orignal.copy()[start:end]
         self.y = self._y_orignal.copy()[start:end]
-        self.error = self._error_orignal.copy()[start:end]
+        #self.error = self._error_orignal.copy()[start:end]
 
 class abstract_fitting:
     def __init__(self):
         self._p0 : np.ndarray
         self._varMatrix : np.ndarray
-        self.scan : Scan
+        self.scan : scan
         self.guess : np.ndarray
         self.bounds = 0
         self.sigma = []
@@ -225,10 +225,11 @@ class Rabi(abstract_fitting):
         return -a*np.cos(x*omega)*np.exp(-decay*x)+c
     
 if __name__ == '__main__':
-    filepath = 'analysis/07/21/20210721_009/20210721_009_scan.h5'
-    sc = Scan(filepath)
-    print(sc.rabi.p0())
-    filepath = 'analysis/07/22/20210722_038/20210722_038_scan.h5'
-    sc = Scan(filepath)
+    function = 'a0'
+    filepath = 'tests/20210707_005_scan.h5'
+    sc = scan(filepath, function)
+    #print(sc.rabi.p0())
+    filepath = 'tests/20210707_005_scan.h5'
+    sc = scan(filepath, function)
     sc.set_range([0,47])
-    print(sc.rabi.p0()[0])
+    #print(sc.rabi.p0()[0])

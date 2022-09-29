@@ -1,4 +1,4 @@
-from .context import scan
+from .context import e11scan
 import numpy as np
 from pytest import approx, raises
 import pandas as pd
@@ -7,7 +7,7 @@ def test_scan_baseValue():
     # Generate analysis data using Scan object
     filename = 'tests/20210707_005_scan.h5'
     function = '-(a0 - a1)/((a0 - a1) + (a0 - a2))'
-    sc = scan.Scan(filename= filename, function=function)
+    sc = e11scan.scan(filename= filename, function=function)
     assert sc.baseValue == -0.500220349806397
 
 
@@ -15,7 +15,7 @@ def test_scan_output():
     # Generate analysis data using Scan object
     filename = 'tests/20210707_005_scan.h5'
     function = '-(a0 - a1)/((a0 - a1) + (a0 - a2))'
-    sc = scan.Scan(filename = filename, function=function, power=0, efield=0, detuning=0)
+    sc = e11scan.scan(filename = filename, function=function, power=0, efield=0, detuning=0)
     # Load analysis data generated in Matlab
     data =  pd.read_csv('tests/m70mV_005.dat', delimiter = '\t', names = ['f', 'x', 'err'])
     
@@ -35,7 +35,7 @@ def test_scan_gaussian():
     # Generate analysis data using Scan object
     filename = 'tests/20210707_005_scan.h5'
     function = '-(a0 - a1)/((a0 - a1) + (a0 - a2))'
-    sc = scan.Scan(filename = filename, function=function)
+    sc = e11scan.scan(filename = filename, function=function)
     coeff = [1.41586588e-01, 1.95563550e+01, 6.61302896e-05]
 
     for i in range(len(sc.gauss.p0())):
@@ -44,5 +44,5 @@ def test_scan_gaussian():
 def test_plot():
     filename = 'tests/20210707_005_scan.h5'
     function = '-(a0 - a1)/((a0 - a1) + (a0 - a2))'
-    sc = scan.Scan(filename = filename, function=function)
+    sc = e11scan.scan(filename = filename, function=function)
     sc.plot_trace(10)
