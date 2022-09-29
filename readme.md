@@ -64,7 +64,10 @@ The file is also accessible from the Scan object:
 <HDF5 file "20210707_005_scan.h5" (mode r)>
 
 ```
-The metadata associated with the file is stored as a proxy object accessible using key value pairs through `f.attrs` i.e:
+The metadata associated with the file is stored as a proxy object accessible using key value pairs through `f.attrs`. The metadata available depends on which oscilloscope was used.
+
+
+Example:
 ```
 >>> sc.f.attrs.keys()
 <KeysViewHDF5 ['run_ID', 'timestamp', 'v0_loops', 'v0_num', 'v0_options', 'v0_repeats', 'v1_loops', 'v1_num', 'v1_options', 'v1_repeats', 'var 0', 'var 1']>
@@ -80,11 +83,31 @@ The metadata associated with the file is stored as a proxy object accessible usi
 | `v1_loops`   |                                                        |
 | `v1_num`     |                                                        |
 | `v1_options` |                                                        |
-| `v1_repeats` |                                                        |
+| `v1_repeats` |                                                        |                                                |
 | `var 0`      | Type of measurement i.e. `microwaves (GHz)`             |
 | `var 1`      |                                                        |
 
-
+Alternative Example (lecroy)
+| `key`                | Description                                               |
+|----------------------|-----------------------------------------------------------|
+| `num_rows`           |                                                           |
+| `run_id`             | Date of file and measurement number i.e.   `20210707_005` |
+| `scope_VISA`         | Visa name i.e `lecroy`                                    |
+| `scope_averages`     | Number of averages used by scope                          |
+| `scope_channels`     | Channel number                                            |
+| `scope_max_points`   | Number of points                                          |
+| `scope_noise filter` |                                                           |
+| `scope_timeout (ms)` |                                                           |
+| `timestamp`          | i.e `2021-07-07 15:04:14`                                 |
+| `v0_VISA`            | Extra visa info i.e. `COM 4`                              |
+| `v0_hardware`        |                                                           |
+| `v0_loops`           | Number of measurement loops on `v0`                       |
+| `v0_options`         |                                                           |
+| `v0_repeats`         |                                                           |
+| `v1_hardware`        |                                                           |
+| `v1_loops`           |                                                           |
+| `v1_options`         |                                                           |
+| `v1_repeats`         |                                                           |
 
 Each file has two datasets:
 - `analysis`: Data after applying windows

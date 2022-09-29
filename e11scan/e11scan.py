@@ -48,11 +48,12 @@ class scan:
         # Read number of loops
         self.numloops = self.f.attrs['v0_loops']
 
-        # Read number of measurments
-        self.nummeasurements = self.f.attrs['v0_num']
-
         # read experiment type from metadata
         if self.experiment == None:
+            try: 
+                self.f.attrs['var 0']
+            except:
+                raise ValueError('Could not deduce experiment type, please set experiment type manually')
             if self.f.attrs['var 0'] == 'microwaves (GHz)':
                 self.experiment = 'microwave'
             else:
@@ -71,7 +72,6 @@ class scan:
         
         # Group data points by x (v0) and calculate mean, and apply baseline if appropiate
         self.process_signal()
-
 
     def evaluate_windows(self):
         # convert input string i.e a0 + a1 into something python can evaluate
@@ -121,8 +121,7 @@ class scan:
             plt.vlines(self.windows[key]+self.f['osc_0'].attrs['t0'], minval, maxval, label=key, color=[str(color[key])])
 
         plt.legend()
-        
-    
+
     def trace(self, ind):
         if ind>len(self.f['osc_0']):
             raise ValueError(f"Number of scans is {len(self.f['osc_0'])}, {ind} is outside range")
