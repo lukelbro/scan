@@ -3,10 +3,10 @@ My personal library for working with data from the E11 lab. The data format used
 
 How to use Scan object:
 ```
-from e11scan import Scan
+from e11scan import scan
 filename = 'tests/20210707_005_scan.h5'
 function = '-(a0 - a1)/((a0 - a1) + (a0 - a2))'
-sc = scan.Scan(filename = filename, function = function)
+sc = scan(filename = filename, function = function)
 ```
 The scan object automatically processes the data by grouping and averaging measurements made at the same point and subtracting a baseline value. The baseline that is subtracted depends on the type of the experiment. The experiment type is read from the metadata in the h5py file.
 
@@ -20,7 +20,7 @@ Experiment Types
 
 The experiment type used can also be set manually:
 ```
-scan.Scan(filename = filename, function = function, experiment = 'experiment')
+scan(filename = filename, function = function, experiment = 'experiment')
 ```
 
 Change the evaluation function:
@@ -59,7 +59,7 @@ f = h5py.File('FILENAME', 'r')
 ```
 The file is also accessible from the Scan object:
 ```
->>> sc = Scan(filename = 'FILENAME', function = 'a0')
+>>> sc = scan(filename = 'FILENAME', function = 'a0')
 >>> sc.f
 <HDF5 file "20210707_005_scan.h5" (mode r)>
 
