@@ -54,6 +54,15 @@ Plot a trace with location of windows:
 ```
 ![trace_example.png](trace_example.png)
 
+Plot the stability of the signal:
+```
+>>> sc.plot_stability()
+```
+![stability_example.png](stability_example.png)
+
+By default the function `a0 - a1` is used. A custom function can also be used e.g `sc.plot_stability(a0-a2)`
+
+
 ##  Reference: File structure
 A file can be loaded using 
 ```

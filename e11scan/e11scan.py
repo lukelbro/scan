@@ -121,6 +121,18 @@ class scan:
             plt.vlines(self.windows[key]+self.f['osc_0'].attrs['t0'], minval, maxval, label=key, color=[str(color[key])])
 
         plt.legend()
+    def plot_stability(self, customfunction = 'a0-a1'):
+        """Plots the stability of the signal from a0 - a1
+
+        Args:
+            customfunction (str, optional): Option for custom function. Defaults to 'a0-a1'.
+        """
+        functionstring = scan.function_parser(customfunction)
+        stability = eval(functionstring)
+
+        plt.scatter(np.linspace(0, stability.shape[0], stability.shape[0]), stability, s=1)
+        plt.xlabel('measurement number')
+        plt.ylabel(customfunction)
 
     def trace(self, ind):
         if ind>len(self.f['osc_0']):
