@@ -61,8 +61,8 @@ class scan:
                 print(f'{Fore.RED}WARNING{Fore.RED}: New type of experiment {Fore.RED}{self.experiment}{Fore.RESET} using settings for generic')
         else:
             if self.experiment not in ['microwave']:
+                print(f'{Fore.RED}WARNING{Fore.RESET}: New type of experiment {Fore.RED}{self.experiment}{Fore.RESET} using settings for generic')
                 self.experiment = 'generic'
-                print(f'{Fore.RED}WARNING{Fore.RED}: New type of experiment {Fore.RED}{self.experiment}{Fore.RESET} using settings for generic')
      
         # Load data into Pandas data frame
         self.df = pd.DataFrame.from_records(self.dset, columns=self.dset.dtype.fields.keys())

@@ -46,3 +46,8 @@ def test_plot():
     function = '-(a0 - a1)/((a0 - a1) + (a0 - a2))'
     sc = e11scan.scan(filename = filename, function=function)
     sc.plot_trace(10)
+
+def test_no_experiment_in_file():
+    with raises(ValueError):
+        e11scan.scan(filename='tests/20220624_007_scan.h5', function='a0')
+
