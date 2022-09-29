@@ -1,9 +1,9 @@
 # Scan Data Object
-My personal library for working with data from the E11 lab. The data format used in the lab is HDF5. All the data from an experiment is included in this file, including metadata. The files can be read for analysis using the [h5py](https://www.h5py.org) library. A reference section can be found below that outlines the structure of these files.
+My personal library for working with data from the E11 lab. The data format used in the lab is HDF5. All the data from an experiment is included in this file, including metadata. The files can be read for analysis using the [h5py](https://www.h5py.org) library. A description of the Scan object is below as well as a reference section can be found below that outlines the structure of these files.
 
 How to use Scan object:
 ```
-from scan import Scan
+from e11scan import Scan
 filename = 'tests/20210707_005_scan.h5'
 function = '-(a0 - a1)/((a0 - a1) + (a0 - a2))'
 sc = scan.Scan(filename = filename, function = function)
@@ -128,7 +128,10 @@ Or accessed using:
 sc.f['osc_0'][index]
 ```
 
-
+## Instillation
+```
+pip install git+https://github.com/lukelbro/scan
+```
 
 
 
