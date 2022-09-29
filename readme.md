@@ -6,7 +6,7 @@ How to use Scan object:
 from scan import Scan
 filename = 'tests/20210707_005_scan.h5'
 function = '-(a0 - a1)/((a0 - a1) + (a0 - a2))'
-sc = scan.Scan(filename= filename, function=function)
+sc = scan.Scan(filename = filename, function = function)
 ```
 The scan object automatically processes the data by grouping and averaging measurements made at the same point and subtracting a baseline value. The baseline that is subtracted depends on the type of the experiment. The experiment type is read from the metadata in the h5py file.
 
@@ -18,7 +18,7 @@ Experiment Types
 - Generic Scan: 
     - Baseline calculated from the signal measured for the lowest x value.
 
-The experiment type used can be also be set manually:
+The experiment type used can also be set manually:
 ```
 scan.Scan(filename = filename, function = function, experiment)
 ```
