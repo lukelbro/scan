@@ -60,7 +60,7 @@ class scan:
                 self.experiment = 'generic'
                 print(f'{Fore.RED}WARNING{Fore.RED}: New type of experiment {Fore.RED}{self.experiment}{Fore.RESET} using settings for generic')
         else:
-            if self.experiment not in ['microwave', 'volt']:
+            if self.experiment not in ['microwave', 'volt', 'time']:
                 print(f'{Fore.RED}WARNING{Fore.RESET}: New type of experiment {Fore.RED}{self.experiment}{Fore.RESET} using settings for generic')
                 self.experiment = 'generic'
      
@@ -93,6 +93,8 @@ class scan:
         if self.experiment == 'microwave':
             self.baseValue = dfmean['signal'].take(np.arange(0,10)).mean()
         elif self.experiment == 'volt':
+            self.baseValue = 0
+        elif self.experiment == 'time':
             self.baseValue = 0
         elif self.experiment == 'generic':
             self.baseValue = 0
