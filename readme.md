@@ -11,16 +11,16 @@ sc = scan.Scan(filename = filename, function = function)
 The scan object automatically processes the data by grouping and averaging measurements made at the same point and subtracting a baseline value. The baseline that is subtracted depends on the type of the experiment. The experiment type is read from the metadata in the h5py file.
 
 Experiment Types
-- Microwave Scan
+- Microwave Scan (microwave):
     - Baseline processing: baseline calculated from the signal of the lowest 10 microwave frequencies.
-- Time Scan: 
+- Time Scan (time): 
     - Baseline calculated from the signal measured for the lowest time value.
-- Generic Scan: 
+- Generic Scan (generic): 
     - Baseline calculated from the signal measured for the lowest x value.
 
 The experiment type used can also be set manually:
 ```
-scan.Scan(filename = filename, function = function, experiment)
+scan.Scan(filename = filename, function = function, experiment = 'experiment')
 ```
 
 Change the evaluation function:
