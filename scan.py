@@ -7,6 +7,7 @@ import numpy as np
 from scipy.optimize import curve_fit
 from functools import cache, singledispatch
 from  colorama import Fore
+from matplotlib import pyplot as plt
 
 @dataclass
 class Scan:
@@ -14,7 +15,7 @@ class Scan:
     filename: str
     function: str
 
-    experiment: str = 'generic' # 'generic', 'volt', 'microwave', 'time'
+    experiment: str = None # 'generic', 'volt', 'microwave', 'time'
     power: float = None
     efield: int = None
     detuning: float = None
@@ -51,11 +52,16 @@ class Scan:
         self.nummeasurements = self.f.attrs['v0_num']
 
         # read experiment type from metadata
-        if self.f.attrs['var 0'] == 'microwaves (GHz)':
-            self.experiment = 'microwave'
+        if self.experiment == None:
+            if self.f.attrs['var 0'] == 'microwaves (GHz)':
+                self.experiment = 'microwave'
+            else:
+                self.experiment = 'generic'
+                print(f'{Fore.RED}WARNING{Fore.RED}: New type of experiment {Fore.RED}{self.experiment}{Fore.RESET} using settings for generic')
         else:
-            self.experiment = 'generic'
-            print(f'{Fore.RED}WARNING{Fore.RED}: New type of experiment {Fore.RED}{self.experiment}{Fore.RESET} using settings for generic')
+            if self.experiment not in ['microwave']:
+                self.experiment = 'generic'
+                print(f'{Fore.RED}WARNING{Fore.RED}: New type of experiment {Fore.RED}{self.experiment}{Fore.RESET} using settings for generic')
      
         # Load data into Pandas data frame
         self.df = pd.DataFrame.from_records(self.dset, columns=self.dset.dtype.fields.keys())
@@ -66,9 +72,6 @@ class Scan:
         # Group data points by x (v0) and calculate mean, and apply baseline if appropiate
         self.process_signal()
 
-        # load fitting routines (does not do fit now)
-        self.gauss = Gauss(self)
-        self.rabi = Rabi(self)
 
     def evaluate_windows(self):
         # convert input string i.e a0 + a1 into something python can evaluate
@@ -101,36 +104,52 @@ class Scan:
         self._x_orignal = self.x.copy()
         self._y_orignal = self.y.copy()
 
+        # load fitting routines (does not do fit now)
+        self.gauss = Gauss(self)
+        self.rabi = Rabi(self)
+    
+    def plot_trace(self, ind):
+        tt, signal  = self.trace(ind)
+        plt.plot(tt, signal)
+        plt.xlabel('time')
+        plt.ylabel('signal')
+
+        minval = np.min(signal)
+        maxval = np.max(signal)
+        color = {'A': 'tab:pink', 'B':'tab:green', 'C': 'tab:red', 'D':'tab:orange', 'E':'tab:purple', 'F':'tab:olive'}
+        for key in self.windows.keys():
+            plt.vlines(self.windows[key]+self.f['osc_0'].attrs['t0'], minval, maxval, label=key, color=[str(color[key])])
+
+        plt.legend()
+        
+    
+    def trace(self, ind):
+        if ind>len(self.f['osc_0']):
+            raise ValueError(f"Number of scans is {len(self.f['osc_0'])}, {ind} is outside range")
+        signal = self.f['osc_0'][ind]
+        t0 = self.f['osc_0'].attrs['t0']
+        dt = self.f['osc_0'].attrs['dt']
+        tt = np.linspace(t0, t0+dt*len(signal), len(signal))
+    
+        return tt, signal
+
     def update_function(self, function):
-        pass
+        self.function = function
+        self.evaluate_windows()
+        self.process_signal()
+    
+    def update_experiment(self, experiment):
+        self.experiment = experiment
+        self.evaluate_windows()
+        self.process_signal()
 
     def set_range(self, range):
         "Select subset of y based on values of x"
         start = range[0]
         end = range[1]
-
         self.x = self._x_orignal.copy()[start:end]
         self.y = self._y_orignal.copy()[start:end]
         self.error = self._error_orignal.copy()[start:end]
-
-    def savefile(self, dir):
-        return
-
-    def get_dataframe(self):
-        """Auxillary function for unit testing.
-
-        Returns:
-            Pandas DataFrame: data frame where signal is analysis column. Baseline value has
-            not been subtracted and frequency values have not been grouped/averaged.
-        """
-        # Load data from hdf5 file
-        f = h5py.File(self.filename, 'r')
-        dset = f['analysis']
-        # Load data into Pandas data frame
-        df = pd.DataFrame.from_records(dset, columns=dset.dtype.fields.keys())
-        # Generate signal data from windows
-        df['signal'] =  -(df['a0'] - df['a1'])/((df['a0'] - df['a1']) + (df['a0'] - df['a2']))
-        return df
 
 class abstract_fitting:
     def __init__(self):

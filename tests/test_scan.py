@@ -7,7 +7,7 @@ def test_scan_baseValue():
     # Generate analysis data using Scan object
     filename = 'tests/20210707_005_scan.h5'
     function = '-(a0 - a1)/((a0 - a1) + (a0 - a2))'
-    sc = scan.Scan(filename= filename, function = function )
+    sc = scan.Scan(filename= filename, function=function)
     assert sc.baseValue == -0.500220349806397
 
 
@@ -41,3 +41,8 @@ def test_scan_gaussian():
     for i in range(len(sc.gauss.p0())):
         assert sc.gauss.p0()[i] == approx(coeff[i], abs=1e-8)
 
+def test_plot():
+    filename = 'tests/20210707_005_scan.h5'
+    function = '-(a0 - a1)/((a0 - a1) + (a0 - a2))'
+    sc = scan.Scan(filename = filename, function=function)
+    sc.plot_trace(10)
