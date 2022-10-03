@@ -95,7 +95,7 @@ class scan:
         elif self.experiment == 'volt':
             self.baseValue = 0
         elif self.experiment == 'time':
-            self.baseValue = dfmean['signal'].take(0)
+            self.baseValue = dfmean['signal'].take([0]).values
         elif self.experiment == 'generic':
             self.baseValue = 0
         else:

@@ -51,3 +51,8 @@ def test_no_experiment_in_file():
     with raises(ValueError):
         e11scan.scan(filename='tests/20220624_007_scan.h5', function='a0')
 
+def test_time():
+    function = '-(a0 - a1)/((a0 - a1) + (a0 - a2))'
+    sc = e11scan.scan(filename='tests/20210722_038_scan.h5', function=function, experiment='time')
+    assert sc.baseValue == approx(-0.5105504, abs=1e-8)
+
