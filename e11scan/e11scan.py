@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 from scipy.optimize import curve_fit
 from functools import cache, singledispatch
-from  colorama import Fore
+from colorama import Fore
 from matplotlib import pyplot as plt
 
 @dataclass
@@ -23,11 +23,8 @@ class scan_base:
     timestamp: np.datetime64 = None
     x2 : float = None
     df: pd.DataFrame = None
-
-    x: np.ndarray = np.array([0]) # Array of frequencies from h5 file
-    y: np.ndarray = np.array([0]) # Array of data point from h5 file
     error: np.ndarray = np.array([0])
-    baseValue: float = None
+
 
     def __post_init__(self):
         pass 
@@ -113,9 +110,13 @@ class scan_base:
 
 
 class scan(scan_base):
-
     def __post_init__(self):
         super().__post_init__()
+        self.x =  np.array([0]) # Array of frequencies from h5 file
+        self.y = np.array([0]) # Array of data point from h5 file
+        self.error = np.array([0])
+        self.baseValue = None
+
         # Load data from hdf5 file
         try:
             self.f = h5py.File(self.filename, 'r')
@@ -180,32 +181,31 @@ class scan(scan_base):
         for key in self.windows.keys():
             plt.vlines(self.windows[key]+self.f['osc_0'].attrs['t0'], minval, maxval, label=key, color=[str(color[key])])
         plt.legend()
-    
 
 class scanmd(scan):
-    set: list = []
-    x2: list = []
 
     def __post_init__(self):
         super().__post_init__()
-    
+        
     def build_database(self):
         # Load data into Pandas data frame
         self.df = pd.DataFrame.from_records(self.dset, columns=self.dset.dtype.fields.keys())
 
+        # Generate signal data from windows
+        self.evaluate_windows()
+
+
         # Check if data is multidimensional.
         self.x2 =  list(set(self.df['v1']))
         self.x2.sort()
-
-        # Generate signal data from windows
-        self.evaluate_windows()
+        self.sets = []
         
         for val in self.x2:
-            dfval = self.df[self.df['v1']==val]
-            sc = scan_base(experiment=self.experiment, df=dfval, x2 = val, function=self.function, filename=self.filename)
+            dfval = self.df[self.df['v1'] == val]
+            sc = scan_base(experiment = self.experiment, df=dfval, x2 = val, function = self.function, filename = self.filename)
             # Group data points by x (v0) and calculate mean, and apply baseline if appropiate
             sc.process_signal()
-            self.set.append(sc)
+            self.sets.append(sc)
     
 class abstract_fitting:
     def __init__(self):
@@ -283,11 +283,12 @@ class Rabi(abstract_fitting):
 if __name__ == '__main__':
     function = 'a0'
     filepath = 'tests/20210707_005_scan.h5'
-    sc = scan(filepath, function)
+    #sc = scan(filepath, function)
     #print(sc.rabi.p0())
-    filepath = 'tests/20210707_005_scan.h5'
-    sc = scan(filepath, function)
-
-    x = sc.x
-    sc.set_range([0,47])
+    #sc.set_range([0,47])
     #print(sc.rabi.p0()[0])
+    filepath = 'tests/20221208_006_scan.h5'
+    
+    sc = scanmd(filepath, function)
+    sc = scanmd(filepath, function)
+    sc = scanmd(filepath, function)

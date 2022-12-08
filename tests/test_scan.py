@@ -62,7 +62,7 @@ def test_scanmd():
     
     sc = e11scan.scanmd(filename=filename, function=function)
     assert len(sc.x2) == 2
-    assert len(sc.set) == 2
+    assert len(sc.sets) == 2
     
     assert sc.x2[0] == -0.03
     assert sc.x2[1] == 0.01

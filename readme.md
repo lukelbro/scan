@@ -63,12 +63,12 @@ Plot the stability of the signal:
 By default the function `a0 - a1` is used. A custom function can also be used e.g `sc.plot_stability(a0-a2)`
 
 ## Two Dimensional Scans
-It is possible to perform measurements in two dimensions - with a range of values in both `v0` and `v1`. For this type of analysis use the `scanmd` object. This object builds a list (`scanmd.set`) of `scan` objects for each dataset associated with independent values of `v1`.  Each `scan` object contains the values of `v0` accessible through `scanmd.set[0].x` as well as the associated `v1` value accessible through `scanmd.set[0].x2`.
+It is possible to perform measurements in two dimensions - with a range of values in both `v0` and `v1`. For this type of analysis use the `scanmd` object. This object builds a list (`scanmd.sets`) of `scan` objects for each dataset associated with independent values of `v1`.  Each `scan` object contains the values of `v0` accessible through `scanmd.sets[0].x` as well as the associated `v1` value accessible through `scanmd.set[0].x2`.
 
 ```
 scs = scanmd(filename = 'filename_of_twodimensional_dataset', function= 'a0-a1')
 
-for sc in scs.set:
+for sc in scs.sets:
     plt.plot(sc.x, sc.y, label = sc.x2)
 ```
 
