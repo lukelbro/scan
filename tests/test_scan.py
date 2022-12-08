@@ -67,3 +67,16 @@ def test_scanmd():
     assert sc.x2[0] == -0.03
     assert sc.x2[1] == 0.01
 
+
+def test_scanmd_double_init_check():
+    filename = 'tests/20221208_006_scan.h5'
+    function = '-(a0 - a1)/((a0 - a1) + (a0 - a2))'
+    
+    sc = e11scan.scanmd(filename=filename, function=function)
+    sc = e11scan.scanmd(filename=filename, function=function)
+    assert len(sc.x2) == 2
+    assert len(sc.sets) == 2
+    
+    assert sc.x2[0] == -0.03
+    assert sc.x2[1] == 0.01
+
