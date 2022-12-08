@@ -56,3 +56,14 @@ def test_time():
     sc = e11scan.scan(filename='tests/20210722_038_scan.h5', function=function, experiment='time')
     assert sc.baseValue == approx(-0.5105504, abs=1e-8)
 
+def test_scanmd():
+    filename = 'tests/20221208_006_scan.h5'
+    function = '-(a0 - a1)/((a0 - a1) + (a0 - a2))'
+    
+    sc = e11scan.scanmd(filename=filename, function=function)
+    assert len(sc.x2) == 2
+    assert len(sc.set) == 2
+    
+    assert sc.x2[0] == -0.03
+    assert sc.x2[1] == 0.01
+

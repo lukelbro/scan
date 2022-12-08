@@ -10,9 +10,9 @@ from  colorama import Fore
 from matplotlib import pyplot as plt
 
 @dataclass
-class scan:
+class scan_base:
     """Data Structure object for H5 scan files from the E11 lab."""
-    filename: str
+    filename: str 
     function: str
 
     experiment: str = None # 'generic', 'volt', 'microwave', 'time'
@@ -21,14 +21,101 @@ class scan:
     detuning: float = None
     scanfreq: float = None
     timestamp: np.datetime64 = None
+    x2 : float = None
+    df: pd.DataFrame = None
 
     x: np.ndarray = np.array([0]) # Array of frequencies from h5 file
     y: np.ndarray = np.array([0]) # Array of data point from h5 file
     error: np.ndarray = np.array([0])
     baseValue: float = None
 
+    def __post_init__(self):
+        pass 
+
+    def evaluate_windows(self):
+        # convert input string i.e a0 + a1 into something python can evaluate
+        functionString = scan.function_parser(self.function)
+        # evaluate windows
+        self.df['signal'] = eval(functionString)
+
+    def function_parser(function):
+        functionString = function
+        functionString = functionString.replace('a0', "self.df['a0']")
+        functionString = functionString.replace('a1', "self.df['a1']")
+        functionString = functionString.replace('a2', "self.df['a2']")
+        return functionString
+
+    def process_signal(self):
+        dfmean = self.df.groupby(['v0']).mean()
+        dfmean = dfmean.sort_values('v0')
+    
+        # Apply baseline
+        if self.experiment == 'microwave':
+            self.baseValue = dfmean['signal'].take(np.arange(0,10)).mean()
+        elif self.experiment == 'volt':
+            self.baseValue = 0
+        elif self.experiment == 'time':
+            self.baseValue = dfmean['signal'].take([0]).values
+        elif self.experiment == 'generic':
+            self.baseValue = 0
+        else:
+            raise ValueError(f'Experiment {self.experiment} not recognised')
+    
+        self.y = np.array((dfmean['signal'] - self.baseValue).to_list())
+        self.x = np.array(dfmean['signal'].keys().to_list())
+        self._x_orignal = self.x.copy()
+        self._y_orignal = self.y.copy()
+
+        # load fitting routines (does not do fit now)
+        self.gauss = Gauss(self)
+        self.rabi = Rabi(self)
+
+    def plot_stability(self, customfunction = 'a0-a1'):
+        """Plots the stability of the signal from a0 - a1
+
+        Args:
+            customfunction (str, optional): Option for custom function. Defaults to 'a0-a1'.
+        """
+        functionstring = scan_base.function_parser(customfunction)
+        stability = eval(functionstring)
+
+        plt.scatter(np.linspace(0, stability.shape[0], stability.shape[0]), stability, s=1)
+        plt.xlabel('measurement number')
+        plt.ylabel(customfunction)
+
+    def trace(self, ind):
+        if ind>len(self.f['osc_0']):
+            raise ValueError(f"Number of scans is {len(self.f['osc_0'])}, {ind} is outside range")
+        signal = self.f['osc_0'][ind]
+        t0 = self.f['osc_0'].attrs['t0']
+        dt = self.f['osc_0'].attrs['dt']
+        tt = np.linspace(t0, t0+dt*len(signal), len(signal))
+    
+        return tt, signal
+
+    def update_function(self, function):
+        self.function = function
+        self.evaluate_windows()
+        self.process_signal()
+    
+    def update_experiment(self, experiment):
+        self.experiment = experiment
+        self.evaluate_windows()
+        self.process_signal()
+
+    def set_range(self, range):
+        "Select subset of y based on values of x"
+        start = range[0]
+        end = range[1]
+        self.x = self._x_orignal.copy()[start:end]
+        self.y = self._y_orignal.copy()[start:end]
+        #self.error = self._error_orignal.copy()[start:end]
+
+
+class scan(scan_base):
 
     def __post_init__(self):
+        super().__post_init__()
         # Load data from hdf5 file
         try:
             self.f = h5py.File(self.filename, 'r')
@@ -64,51 +151,22 @@ class scan:
                 print(f'{Fore.RED}WARNING{Fore.RESET}: New type of experiment {Fore.RED}{self.experiment}{Fore.RESET} using settings for generic')
                 self.experiment = 'generic'
      
+        self.build_database()
+
+    def build_database(self):
         # Load data into Pandas data frame
         self.df = pd.DataFrame.from_records(self.dset, columns=self.dset.dtype.fields.keys())
 
+        # Check if data is multidimensional.
+        x2 =  list(set(self.df['v1']))
+        if len(x2) > 1:
+            print('Multidimensional scan detected use scanmd')
+    
         # Generate signal data from windows
         self.evaluate_windows()
         
         # Group data points by x (v0) and calculate mean, and apply baseline if appropiate
         self.process_signal()
-
-    def evaluate_windows(self):
-        # convert input string i.e a0 + a1 into something python can evaluate
-        functionString = scan.function_parser(self.function)
-        # evaluate windows
-        self.df['signal'] = eval(functionString)
-
-    def function_parser(function):
-        functionString = function
-        functionString = functionString.replace('a0', "self.df['a0']")
-        functionString = functionString.replace('a1', "self.df['a1']")
-        functionString = functionString.replace('a2', "self.df['a2']")
-        return functionString
-
-    def process_signal(self):
-        dfmean = self.df.groupby(['v0']).mean()
-        dfmean = dfmean.sort_values('v0')
-        # Apply baseline
-        if self.experiment == 'microwave':
-            self.baseValue = dfmean['signal'].take(np.arange(0,10)).mean()
-        elif self.experiment == 'volt':
-            self.baseValue = 0
-        elif self.experiment == 'time':
-            self.baseValue = dfmean['signal'].take([0]).values
-        elif self.experiment == 'generic':
-            self.baseValue = 0
-        else:
-            raise ValueError(f'Experiment {self.experiment} not recognised')
-    
-        self.y = np.array((dfmean['signal'] - self.baseValue).to_list())
-        self.x = np.array(dfmean['signal'].keys().to_list())
-        self._x_orignal = self.x.copy()
-        self._y_orignal = self.y.copy()
-
-        # load fitting routines (does not do fit now)
-        self.gauss = Gauss(self)
-        self.rabi = Rabi(self)
     
     def plot_trace(self, ind):
         tt, signal  = self.trace(ind)
@@ -121,49 +179,34 @@ class scan:
         color = {'A': 'tab:pink', 'B':'tab:green', 'C': 'tab:red', 'D':'tab:orange', 'E':'tab:purple', 'F':'tab:olive'}
         for key in self.windows.keys():
             plt.vlines(self.windows[key]+self.f['osc_0'].attrs['t0'], minval, maxval, label=key, color=[str(color[key])])
-
         plt.legend()
-    def plot_stability(self, customfunction = 'a0-a1'):
-        """Plots the stability of the signal from a0 - a1
-
-        Args:
-            customfunction (str, optional): Option for custom function. Defaults to 'a0-a1'.
-        """
-        functionstring = scan.function_parser(customfunction)
-        stability = eval(functionstring)
-
-        plt.scatter(np.linspace(0, stability.shape[0], stability.shape[0]), stability, s=1)
-        plt.xlabel('measurement number')
-        plt.ylabel(customfunction)
-
-    def trace(self, ind):
-        if ind>len(self.f['osc_0']):
-            raise ValueError(f"Number of scans is {len(self.f['osc_0'])}, {ind} is outside range")
-        signal = self.f['osc_0'][ind]
-        t0 = self.f['osc_0'].attrs['t0']
-        dt = self.f['osc_0'].attrs['dt']
-        tt = np.linspace(t0, t0+dt*len(signal), len(signal))
     
-        return tt, signal
 
-    def update_function(self, function):
-        self.function = function
-        self.evaluate_windows()
-        self.process_signal()
+class scanmd(scan):
+    set: list = []
+    x2: list = []
+
+    def __post_init__(self):
+        super().__post_init__()
     
-    def update_experiment(self, experiment):
-        self.experiment = experiment
+    def build_database(self):
+        # Load data into Pandas data frame
+        self.df = pd.DataFrame.from_records(self.dset, columns=self.dset.dtype.fields.keys())
+
+        # Check if data is multidimensional.
+        self.x2 =  list(set(self.df['v1']))
+        self.x2.sort()
+
+        # Generate signal data from windows
         self.evaluate_windows()
-        self.process_signal()
-
-    def set_range(self, range):
-        "Select subset of y based on values of x"
-        start = range[0]
-        end = range[1]
-        self.x = self._x_orignal.copy()[start:end]
-        self.y = self._y_orignal.copy()[start:end]
-        #self.error = self._error_orignal.copy()[start:end]
-
+        
+        for val in self.x2:
+            dfval = self.df[self.df['v1']==val]
+            sc = scan_base(experiment=self.experiment, df=dfval, x2 = val, function=self.function, filename=self.filename)
+            # Group data points by x (v0) and calculate mean, and apply baseline if appropiate
+            sc.process_signal()
+            self.set.append(sc)
+    
 class abstract_fitting:
     def __init__(self):
         self._p0 : np.ndarray
@@ -244,5 +287,7 @@ if __name__ == '__main__':
     #print(sc.rabi.p0())
     filepath = 'tests/20210707_005_scan.h5'
     sc = scan(filepath, function)
+
+    x = sc.x
     sc.set_range([0,47])
     #print(sc.rabi.p0()[0])
