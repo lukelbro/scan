@@ -14,7 +14,8 @@ class scan_base:
     """Data Structure object for H5 scan files from the E11 lab."""
     filename: str 
     function: str
-
+    
+    
     experiment: str = None # 'generic', 'volt', 'microwave', 'time'
     power: float = None
     efield: int = None
@@ -24,7 +25,7 @@ class scan_base:
     x2 : float = None
     df: pd.DataFrame = None
     error: np.ndarray = np.array([0])
-
+    averages: int = None
 
     def __post_init__(self):
         pass 
@@ -62,6 +63,9 @@ class scan_base:
         self.x = np.array(dfmean['signal'].keys().to_list())
         self._x_orignal = self.x.copy()
         self._y_orignal = self.y.copy()
+
+        if self.averages != None:
+            self.error = np.array(dfmean['error'])
 
         # load fitting routines (does not do fit now)
         self.gauss = Gauss(self)
@@ -165,9 +169,19 @@ class scan(scan_base):
     
         # Generate signal data from windows
         self.evaluate_windows()
-        
+        # Calculate error on db
+        self.calculate_signal_error()
         # Group data points by x (v0) and calculate mean, and apply baseline if appropiate
         self.process_signal()
+        
+    def calculate_signal_error(self):
+        """Calculate error of data points using standard error and error propogation
+        """
+        # Check if averages have been given
+        if self.averages != None:
+            df = self.df
+            df['error'] = np.sqrt(0.25/self.averages) * 1/(np.sqrt(self.numloops))
+            # 0.25 comes from the maximum error from bernoulli trials (so an overestimate of the error - seeems reasonable-ish)
     
     def plot_trace(self, ind):
         tt, signal  = self.trace(ind)
@@ -194,7 +208,7 @@ class scanmd(scan):
         # Generate signal data from windows
         self.evaluate_windows()
 
-
+        self.calculate_signal_error()
         # Check if data is multidimensional.
         self.x2 =  list(set(self.df['v1']))
         self.x2.sort()
@@ -202,7 +216,7 @@ class scanmd(scan):
         
         for val in self.x2:
             dfval = self.df[self.df['v1'] == val]
-            sc = scan_base(experiment = self.experiment, df=dfval, x2 = val, function = self.function, filename = self.filename)
+            sc = scan_base(experiment = self.experiment, df=dfval, x2 = val, function = self.function, filename = self.filename, averages=self.averages)
             # Group data points by x (v0) and calculate mean, and apply baseline if appropiate
             sc.process_signal()
             self.sets.append(sc)
@@ -216,7 +230,7 @@ class abstract_fitting:
         self.bounds = 0
         self.sigma = []
         self.fitdone = False
-    
+        
     @staticmethod
     def func(x):
         return
@@ -227,7 +241,7 @@ class abstract_fitting:
             self.guess = userGuess
         scan = self.scan
         p = self.guess
-        if len(self.sigma) >  0:
+        if len(self.sigma) >  1:
             self._p0, self._varMatrix = curve_fit(self.func, scan.x, scan.y, p0=p, absolute_sigma=True, sigma=scan.error)
         else:
             if self.bounds == 0:
@@ -255,13 +269,13 @@ class abstract_fitting:
         x = self.scan.x
         y = self.func(x, *self.p0)
         return y
-    
 
 class Gauss(abstract_fitting):
     def __init__(self, scan):
         super().__init__()
         self.guess = [np.max(scan.x), scan.x[np.argmax(scan.y)], 0.0001]
         self.scan = scan
+        self.sigma = self.scan.error
 
     @staticmethod
     def func(x, *p):

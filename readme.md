@@ -60,10 +60,10 @@ Plot the stability of the signal:
 ```
 ![stability_example.png](stability_example.png)
 
-By default the function `a0 - a1` is used. A custom function can also be used e.g `sc.plot_stability(a0-a2)`
+By default, the function `a0 - a1` is used. A custom function can also be used e.g `sc.plot_stability(a0-a2)`
 
 ## Fitting Routines
-Basic fitting routines for fitting oscillatory data and gaussian peaks are included. The best fit values `p0` and variance matrix `varMatrix` can be accessed through a scan object i.e.
+Basic fitting routines for fitting oscillatory data and Gaussian peaks are included. The best fit values `p0` and variance matrix `varMatrix` can be accessed through a scan object i.e.
 
 ### Gaussian
 $$
@@ -100,6 +100,18 @@ It is possible to perform measurements in two dimensions - with a range of value
 >>>    plt.plot(sc.x, sc.y, label = sc.x2)
 ```
 
+## Error Calculation
+For a full calculation of the error the distribution functions of the states must be known. If the states do not overlap then a calculation of the standard error of each data point can be estimated. To calculate the standard error the standard deviation of each measurement must be known.
+
+An estimation of the standard deviation of each measurement can be made by treating the measurements, $x_i$, as Bernoulli trial (only valid if the distributions do not overlap):
+$$
+\sigma_\mathrm{x_i} = \sqrt{\frac{pq}{n}}
+$$
+where $p$ is the probability of success, $q = 1 - p$, and $n$ is the number of averages on the oscilloscope. The error is then calculated by setting $p$ equal to the signal calculated using data from the oscilloscope and the windows. This is only valid if the value of the signal has been correctly normalized. If this is not the case then an overestimate of the error can be made by setting $p=0.5$.
+
+If standard error can then be calculated by considering the number of loops:
+
+
 
 ##  Reference: File structure
 A file can be loaded using 
@@ -116,7 +128,7 @@ The file is also accessible from the Scan object:
 The metadata associated with the file is stored as a proxy object accessible using key value pairs through `f.attrs`. The metadata available depends on which oscilloscope was used.
 
 
-Example:
+Example (agilent):
 ```
 >>> sc.f.attrs.keys()
 <KeysViewHDF5 ['run_ID', 'timestamp', 'v0_loops', 'v0_num', 'v0_options', 'v0_repeats', 'v1_loops', 'v1_num', 'v1_options', 'v1_repeats', 'var 0', 'var 1']>
