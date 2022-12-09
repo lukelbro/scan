@@ -27,8 +27,8 @@ scan(filename = filename, function = function, experiment = 'experiment')
 
 Change the evaluation function:
 ```
-function = 'a0 - a1'
-sc.update_function(function)
+>>> function = 'a0 - a1'
+>>> sc.update_function(function)
 ```
 
 Access an individual trace:
@@ -62,14 +62,42 @@ Plot the stability of the signal:
 
 By default the function `a0 - a1` is used. A custom function can also be used e.g `sc.plot_stability(a0-a2)`
 
+## Fitting Routines
+Basic fitting routines for fitting oscillatory data and gaussian peaks are included. The best fit values `p0` and variance matrix `varMatrix` can be accessed through a scan object i.e.
+
+### Gaussian
+$$
+A \, e^{- \frac{(x-\mu)^2}{2 \sigma^2}}
+$$
+
+```
+>>> sc = scan(filename, function)
+>>> sc.Gauss.p0
+array([8.90789113e-03, 1.95563556e+01, 6.64935890e-05])
+
+>> sc.varMatrix
+array([[ 2.82771663e-08,  6.16810598e-13, -1.40790216e-10],
+       [ 6.16810598e-13,  2.10294996e-12, -4.60657391e-15],
+       [-1.40790216e-10, -4.60657391e-15,  2.10293986e-12]])
+```
+`p0()` and `varMatrix()` returns fit parameters in the order: `[A, mu, sigma]`
+
+It is also possible to return the values predicted by the model.
+```
+>> sc = scan(filename, function)
+>> plt.plot(sc.x, sc.gauss.fit)
+```
+![gauss_fit_example.png](gauss_fit_example.png)
+
+
 ## Two Dimensional Scans
 It is possible to perform measurements in two dimensions - with a range of values in both `v0` and `v1`. For this type of analysis use the `scanmd` object. This object builds a list (`scanmd.sets`) of `scan` objects for each dataset associated with independent values of `v1`.  Each `scan` object contains the values of `v0` accessible through `scanmd.sets[0].x` as well as the associated `v1` value accessible through `scanmd.set[0].x2`.
 
 ```
-scs = scanmd(filename = 'filename_of_twodimensional_dataset', function= 'a0-a1')
+>>> scs = scanmd(filename = 'filename_of_twodimensional_dataset', function= 'a0-a1')
 
-for sc in scs.sets:
-    plt.plot(sc.x, sc.y, label = sc.x2)
+>>> for sc in scs.sets:
+>>>    plt.plot(sc.x, sc.y, label = sc.x2)
 ```
 
 
@@ -148,9 +176,8 @@ The data can be read into a pandas data frame using:
 
 ```
 >>> import pandas as pd
->>> df = pd.DataFrame.from_records(sc.f['analysis'], columns=sc.f['analysis'
+>>> df = pd.DataFrame.from_records(sc.f['analysis'], columns = sc.f['analysis'
 ].dtype.fields.keys())
->>>
 ```
 
 The dataframe then has columns: `v0, v1, w0, w1, a0, a1, a2`.
@@ -173,7 +200,8 @@ sc.f['osc_0'][index]
 ```
 
 
-## Instillation
+
+# Instillation
 ```
 pip install git+https://github.com/lukelbro/scan
 ```
