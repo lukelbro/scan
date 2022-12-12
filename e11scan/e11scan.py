@@ -25,10 +25,13 @@ class scan_base:
     x2 : float = None
     df: pd.DataFrame = None
     error: np.ndarray = np.array([0])
+    range: list = None
     averages: int = None
 
+    filterbool: bool = False
+
     def __post_init__(self):
-        pass 
+        pass
 
     def evaluate_windows(self):
         # convert input string i.e a0 + a1 into something python can evaluate
@@ -66,11 +69,45 @@ class scan_base:
 
         if self.averages != None:
             self.error = np.array(dfmean['error'])
+        
+        # Not an efficient solution
+        ranges = self.df.groupby(['v0']).agg({'signal': [np.min, np.max, np.mean]})
+        ranges = ranges.sort_values('v0')
+        signalmin = ranges['signal']['amin']
+        signalmax = ranges['signal']['amax']
+        signalmean = ranges['signal']['mean']
+
+        self.range = [np.abs(signalmin - signalmean), np.abs(signalmax - signalmean)]
 
         # load fitting routines (does not do fit now)
         self.gauss = Gauss(self)
         self.rabi = Rabi(self)
+    
+    def basic_filter(self, m):
+        if self.filterbool == False:
+            self.df_spare = self.df.copy()
+        
+        self.df = self.df_spare.copy()
+        df = self.df
+        idrop = []
+        for v0 in np.array(df['v0']):
+            dfi = df[df['v0'] == v0]
+            signal = dfi['signal']
+            signal.sort_values()
+            d1 = np.abs(signal.iloc[0] - signal.iloc[1])
+            d2 = np.abs(signal.iloc[1] - signal.iloc[2])
 
+            if d1 > m*d2:
+                idrop.append(signal.index[0])
+
+            if d2 > m*d1:  
+                idrop.append(signal.index[2])
+                
+        df.drop(idrop, axis=0, inplace=True)
+        self.filterbool = True
+        self.process_signal()
+    
+        
     def plot_stability(self, customfunction = 'a0-a1'):
         """Plots the stability of the signal from a0 - a1
 
@@ -155,13 +192,13 @@ class scan(scan_base):
             if self.experiment not in ['microwave', 'volt', 'time']:
                 print(f'{Fore.RED}WARNING{Fore.RESET}: New type of experiment {Fore.RED}{self.experiment}{Fore.RESET} using settings for generic')
                 self.experiment = 'generic'
-     
+        
+        
         self.build_database()
 
-    def build_database(self):
-        # Load data into Pandas data frame
-        self.df = pd.DataFrame.from_records(self.dset, columns=self.dset.dtype.fields.keys())
 
+    def build_database(self):
+        self.df = pd.DataFrame.from_records(self.dset, columns=self.dset.dtype.fields.keys())
         # Check if data is multidimensional.
         x2 =  list(set(self.df['v1']))
         if len(x2) > 1:
@@ -173,7 +210,14 @@ class scan(scan_base):
         self.calculate_signal_error()
         # Group data points by x (v0) and calculate mean, and apply baseline if appropiate
         self.process_signal()
-        
+
+    def filter(self, m):
+        self.load_database()
+        self.evaluate_windows()
+        self.basic_filter(m)
+        self.build_database()
+
+
     def calculate_signal_error(self):
         """Calculate error of data points using standard error and error propogation
         """
@@ -202,9 +246,7 @@ class scanmd(scan):
         super().__post_init__()
         
     def build_database(self):
-        # Load data into Pandas data frame
         self.df = pd.DataFrame.from_records(self.dset, columns=self.dset.dtype.fields.keys())
-
         # Generate signal data from windows
         self.evaluate_windows()
 
@@ -229,7 +271,6 @@ class abstract_fitting:
         self.guess : np.ndarray
         self.bounds = 0
         self.sigma = []
-        self.fitdone = False
         
     @staticmethod
     def func(x):
