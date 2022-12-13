@@ -100,7 +100,8 @@ class scan_base:
                 if fname == 'stablem':
                     ids += self.__remove_unstable(m, customfunction)
                 
-            ids = list(set(ids))
+        
+        ids = list(set(ids))
         
         df.drop(ids, axis=0, inplace=True)
         self.process_signal()
@@ -134,11 +135,10 @@ class scan_base:
         functionstring = scan_base.function_parser(customfunction)
         stability = eval(functionstring)
         idrop = []
-        i = 0
-        for s in stability:
-            if s > threshold:
-                idrop.append(i)
-            i += 1
+        
+        for index, value in stability.items():
+            if value > threshold:
+                idrop.append(index)
         return idrop
         
     def plot_stability(self, hline = None, customfunction = 'a0-a1'):
@@ -395,5 +395,8 @@ if __name__ == '__main__':
     #print(sc.rabi.p0()[0])
     filepath = 'tests/20221208_006_scan.h5'
     
-    sc = scanmd(filepath, function)
-    sc.remove_unstable(-0.02)
+    scs = scanmd(filepath, function)
+    #sc.remove_unstable(-0.02)
+    sc = scs.sets[-1]
+    sc.plot_stability(0.012,'(a1-a0)+(a2-a0)')
+    sc.remove_unstable(0.012, customfunction='(a1-a0)+(a2-a0)')
