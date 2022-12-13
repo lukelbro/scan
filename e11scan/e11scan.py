@@ -28,10 +28,9 @@ class scan_base:
     range: list = None
     averages: int = None
 
-    filterbool: bool = False
-
     def __post_init__(self):
-        pass
+        self.filterTracker = {'filterBool' : False, 'filters' : {'basicm': None, 'stablem': None }}
+        
 
     def evaluate_windows(self):
         # convert input string i.e a0 + a1 into something python can evaluate
@@ -83,11 +82,34 @@ class scan_base:
         self.gauss = Gauss(self)
         self.rabi = Rabi(self)
     
-    def basic_filter(self, m):
-        if self.filterbool == False:
+    def filter_manager(self, customfunction = 'a0-a1'):
+        if self.filterTracker['filterBool'] == False:
             self.df_spare = self.df.copy()
+            self.filterTracker['filterBool'] = True
         
         self.df = self.df_spare.copy()
+        df = self.df
+
+        ids = []
+
+        for fname in self.filterTracker['filters'].keys():
+            m = self.filterTracker['filters'][fname]
+            if m != None:
+                if fname == 'basicm':
+                    ids += self.__basic_filter(m)
+                if fname == 'stablem':
+                    ids += self.__remove_unstable(m, customfunction)
+                
+            ids = list(set(ids))
+        
+        df.drop(ids, axis=0, inplace=True)
+        self.process_signal()
+        
+    def basic_filter(self, m):
+        self.filterTracker['filters']['basicm'] = m
+        self.filter_manager()
+
+    def __basic_filter(self, m):
         df = self.df
         idrop = []
         for v0 in np.array(df['v0']):
@@ -101,24 +123,38 @@ class scan_base:
                 idrop.append(signal.index[0])
 
             if d2 > m*d1:  
-                idrop.append(signal.index[2])
-                
-        df.drop(idrop, axis=0, inplace=True)
-        self.filterbool = True
-        self.process_signal()
-    
+                idrop.append(signal.index[2])        
+        return idrop
+
+    def remove_unstable(self, m, customfunction = 'a0-a1'):
+        self.filterTracker['filters']['stablem'] = m
+        self.filter_manager(customfunction)
+
+    def __remove_unstable(self, threshold,  customfunction = 'a0-a1'):
+        functionstring = scan_base.function_parser(customfunction)
+        stability = eval(functionstring)
+        idrop = []
+        i = 0
+        for s in stability:
+            if s > threshold:
+                idrop.append(i)
+            i += 1
+        return idrop
         
-    def plot_stability(self, customfunction = 'a0-a1'):
+    def plot_stability(self, hline = None, customfunction = 'a0-a1'):
         """Plots the stability of the signal from a0 - a1
 
         Args:
             customfunction (str, optional): Option for custom function. Defaults to 'a0-a1'.
         """
+        plt.clf()
         functionstring = scan_base.function_parser(customfunction)
         stability = eval(functionstring)
 
         plt.scatter(np.linspace(0, stability.shape[0], stability.shape[0]), stability, s=1)
         plt.xlabel('measurement number')
+        if hline != None:
+            plt.hlines(hline, 0, stability.shape[0])
         plt.ylabel(customfunction)
 
     def trace(self, ind):
@@ -360,5 +396,4 @@ if __name__ == '__main__':
     filepath = 'tests/20221208_006_scan.h5'
     
     sc = scanmd(filepath, function)
-    sc = scanmd(filepath, function)
-    sc = scanmd(filepath, function)
+    sc.remove_unstable(-0.02)
