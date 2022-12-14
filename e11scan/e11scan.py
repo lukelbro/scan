@@ -98,12 +98,12 @@ class scan_base:
                 if fname == 'basicm':
                     ids += self.__basic_filter(m)
                 if fname == 'stablem':
-                    ids += self.__remove_unstable(m, customfunction)
+                    ids += self.__remove_unstable(m, customfunction=customfunction)
                 
         
         ids = list(set(ids))
         
-        df.drop(ids, axis=0, inplace=True)
+        self.df.drop(ids, axis=0, inplace=True)
         self.process_signal()
         
     def basic_filter(self, m):
@@ -322,9 +322,9 @@ class abstract_fitting:
             self._p0, self._varMatrix = curve_fit(self.func, scan.x, scan.y, p0=p, absolute_sigma=True, sigma=scan.error)
         else:
             if self.bounds == 0:
-                self._p0, self._varMatrix = curve_fit(self.func, scan.x, scan.y, p0=p, absolute_sigma=False)
+                self._p0, self._varMatrix = curve_fit(self.func, scan.x, scan.y, p0=p, absolute_sigma=True)
             else:
-                self._p0, self._varMatrix = curve_fit(self.func, scan.x, scan.y, p0=p, bounds=self.bounds, absolute_sigma=False)  
+                self._p0, self._varMatrix = curve_fit(self.func, scan.x, scan.y, p0=p, bounds=self.bounds, absolute_sigma=True)  
     @property
     def p0(self):
         self.perform_fit()
