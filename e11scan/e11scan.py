@@ -260,7 +260,7 @@ class scan(scan_base):
         # Check if averages have been given
         if self.averages != None:
             df = self.df
-            df['error'] = np.sqrt(0.25/self.averages) * 1/(np.sqrt(self.numloops))
+            df['error'] = np.sqrt(1/self.averages) * 1/(np.sqrt(self.numloops))
             # 0.25 comes from the maximum error from bernoulli trials (so an overestimate of the error - seeems reasonable-ish)
     
     def plot_trace(self, ind):
@@ -322,9 +322,9 @@ class abstract_fitting:
             self._p0, self._varMatrix = curve_fit(self.func, scan.x, scan.y, p0=p, absolute_sigma=True, sigma=scan.error)
         else:
             if self.bounds == 0:
-                self._p0, self._varMatrix = curve_fit(self.func, scan.x, scan.y, p0=p, absolute_sigma=True)
+                self._p0, self._varMatrix = curve_fit(self.func, scan.x, scan.y, p0=p, absolute_sigma=False)
             else:
-                self._p0, self._varMatrix = curve_fit(self.func, scan.x, scan.y, p0=p, bounds=self.bounds, absolute_sigma=True)  
+                self._p0, self._varMatrix = curve_fit(self.func, scan.x, scan.y, p0=p, bounds=self.bounds, absolute_sigma=False)  
     @property
     def p0(self):
         self.perform_fit()
