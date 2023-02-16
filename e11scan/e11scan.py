@@ -397,7 +397,7 @@ class Rabi(abstract_fitting):
     @staticmethod
     def func(x, *p):
         omega, decay, a = p
-        return a*(1-np.cos(x*omega)*np.exp(-decay*x))
+        return a*(1-np.cos(x*omega)*np.exp(-decay*x))/2
     
 if __name__ == '__main__':
     function = 'a0'
