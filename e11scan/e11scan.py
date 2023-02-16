@@ -350,7 +350,7 @@ class abstract_fitting:
 class Gauss(abstract_fitting):
     def __init__(self, scan):
         super().__init__()
-        self.guess = [np.max(scan.x), scan.x[np.argmax(scan.y)], 0.0001]
+        self.guess = [np.max(scan.y), scan.x[np.argmax(scan.y)], np.std(scan.y)]
         self.scan = scan
         self.sigma = self.scan.error
 
