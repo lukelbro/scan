@@ -365,9 +365,8 @@ class Rabi(abstract_fitting):
         self.scan = scan
         self.sigma = self.scan.error
         fftGuess = self.fft_guess()
-        self.guess = [fftGuess["omega"], 0, fftGuess["amp"], fftGuess["offset"]]
-
-        self.bounds = [[0, 0, 0, self.scan.y[0]], [np.inf, np.inf, np.inf, self.scan.y[0] ]]
+        self.guess = [fftGuess["omega"], 0, fftGuess["amp"]]
+        self.bounds = [[0, 0, 0], [np.inf, np.inf, np.inf]]
     
     def fft_guess(self):
         '''Fit sin to the input time sequence, and return fitting parameters "amp", "omega", "phase", "offset", "freq", "period" and "fitfunc"'''
@@ -377,14 +376,28 @@ class Rabi(abstract_fitting):
         Fyy = abs(np.fft.fft(yy))
         guess_freq = abs(ff[np.argmax(Fyy[1:])+1])   # excluding the zero frequency "peak", which is related to offset
         guess_amp = np.std(yy) * 2.**0.5
-        guess_offset = np.mean(yy)
-        guess = np.array([guess_amp, 2.*np.pi*guess_freq, 0., guess_offset])
-        return {"amp": guess_amp, "omega": guess_freq, "offset": guess_offset}
-        
+
+        guess = np.array([guess_amp, 2.*np.pi*guess_freq, 0])
+        return {"amp": guess_amp, "omega": guess_freq}
+
+    def perform_fit(self, userGuess=None):
+        # Fit gaussian function
+        if userGuess != None:
+            self.guess = userGuess
+        scan = self.scan
+        p = self.guess
+        if len(self.sigma) >  1:
+            self._p0, self._varMatrix = curve_fit(self.func, scan.x, scan.y - scan.y[0], p0=p, absolute_sigma=True, sigma=scan.error)
+        else:
+            if self.bounds == 0:
+                self._p0, self._varMatrix = curve_fit(self.func, scan.x, scan.y - scan.y[0], p0=p, absolute_sigma=False)
+            else:
+                self._p0, self._varMatrix = curve_fit(self.func, scan.x, scan.y - scan.y[0], p0=p, bounds=self.bounds, absolute_sigma=False)      
+    
     @staticmethod
     def func(x, *p):
-        omega, decay, a, c = p
-        return a*(1-np.cos(x*omega)*np.exp(-decay*x))+c
+        omega, decay, a = p
+        return a*(1-np.cos(x*omega)*np.exp(-decay*x))
     
 if __name__ == '__main__':
     function = 'a0'
