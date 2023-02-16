@@ -67,7 +67,7 @@ Basic fitting routines for fitting oscillatory data and Gaussian peaks are inclu
 
 ### Gaussian
 $$
-A \, e^{- \frac{(x-\mu)^2}{2 \sigma^2}}
+A  e^{- \frac{(x-\mu)^2}{2 \sigma^2}}
 $$
 
 ```
@@ -90,9 +90,11 @@ It is also possible to return the values predicted by the model.
 ![gauss_fit_example.png](gauss_fit_example.png)
 
 ### Rabi
+
 $$
-A [1 - \cos( \omega t)] \,e^{-t/T_2}/2
+A (1 - \cos(\omega t)) e^{-t/T_{2}}/2
 $$
+
 The fitting routine is performed subtracting the first element of scan.y from y, such that the oscillation starts at the origin.
 
 `p0()` is returned in the order: `[omega, t2, A]`
@@ -100,7 +102,7 @@ The fitting routine is performed subtracting the first element of scan.y from y,
 ```
 >>> sc = scan(filename, function)
 >>> plt.errorbar(sc.x, (sc.y-sc.y[0])/sc.rabi.p0[2], sc.error, ls='none', marker='x', markersize=3, elinewidth=1,alpha=0.7)
->>> plt.plot(sc.x*10**6, (sc.rabi.func(sc.x, *sc.rabi.p0))/sc.rabi.p0[2], label='fit')
+>>> plt.plot(sc.x, (sc.rabi.func(sc.x, *sc.rabi.p0))/sc.rabi.p0[2], label='fit')
 ```
 ![rabi_fit_example.png](rabi_fit_example.png)
 
