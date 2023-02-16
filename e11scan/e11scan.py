@@ -25,10 +25,12 @@ class scan_base:
     x2 : float = None
     df: pd.DataFrame = None
     error: np.ndarray = np.array([0])
+    range: list = None
     averages: int = None
 
     def __post_init__(self):
-        pass 
+        self.filterTracker = {'filterBool' : False, 'filters' : {'basicm': None, 'stablem': None }}
+        
 
     def evaluate_windows(self):
         # convert input string i.e a0 + a1 into something python can evaluate
@@ -66,22 +68,93 @@ class scan_base:
 
         if self.averages != None:
             self.error = np.array(dfmean['error'])
+        
+        # Not an efficient solution
+        ranges = self.df.groupby(['v0']).agg({'signal': [np.min, np.max, np.mean]})
+        ranges = ranges.sort_values('v0')
+        signalmin = ranges['signal']['amin']
+        signalmax = ranges['signal']['amax']
+        signalmean = ranges['signal']['mean']
+
+        self.range = [np.abs(signalmin - signalmean), np.abs(signalmax - signalmean)]
 
         # load fitting routines (does not do fit now)
         self.gauss = Gauss(self)
         self.rabi = Rabi(self)
+    
+    def filter_manager(self, customfunction = 'a0-a1'):
+        if self.filterTracker['filterBool'] == False:
+            self.df_spare = self.df.copy()
+            self.filterTracker['filterBool'] = True
+        
+        self.df = self.df_spare.copy()
+        df = self.df
 
-    def plot_stability(self, customfunction = 'a0-a1'):
+        ids = []
+
+        for fname in self.filterTracker['filters'].keys():
+            m = self.filterTracker['filters'][fname]
+            if m != None:
+                if fname == 'basicm':
+                    ids += self.__basic_filter(m)
+                if fname == 'stablem':
+                    ids += self.__remove_unstable(m, customfunction=customfunction)
+                
+        
+        ids = list(set(ids))
+        
+        self.df.drop(ids, axis=0, inplace=True)
+        self.process_signal()
+        
+    def basic_filter(self, m):
+        self.filterTracker['filters']['basicm'] = m
+        self.filter_manager()
+
+    def __basic_filter(self, m):
+        df = self.df
+        idrop = []
+        for v0 in np.array(df['v0']):
+            dfi = df[df['v0'] == v0]
+            signal = dfi['signal']
+            signal.sort_values()
+            d1 = np.abs(signal.iloc[0] - signal.iloc[1])
+            d2 = np.abs(signal.iloc[1] - signal.iloc[2])
+
+            if d1 > m*d2:
+                idrop.append(signal.index[0])
+
+            if d2 > m*d1:  
+                idrop.append(signal.index[2])        
+        return idrop
+
+    def remove_unstable(self, m, customfunction = 'a0-a1'):
+        self.filterTracker['filters']['stablem'] = m
+        self.filter_manager(customfunction)
+
+    def __remove_unstable(self, threshold,  customfunction = 'a0-a1'):
+        functionstring = scan_base.function_parser(customfunction)
+        stability = eval(functionstring)
+        idrop = []
+        
+        for index, value in stability.items():
+            if value > threshold:
+                idrop.append(index)
+        return idrop
+        
+    def plot_stability(self, hline = None, customfunction = 'a0-a1'):
         """Plots the stability of the signal from a0 - a1
 
         Args:
             customfunction (str, optional): Option for custom function. Defaults to 'a0-a1'.
         """
+        plt.clf()
         functionstring = scan_base.function_parser(customfunction)
         stability = eval(functionstring)
 
         plt.scatter(np.linspace(0, stability.shape[0], stability.shape[0]), stability, s=1)
         plt.xlabel('measurement number')
+        if hline != None:
+            plt.hlines(hline, 0, stability.shape[0])
         plt.ylabel(customfunction)
 
     def trace(self, ind):
@@ -155,13 +228,13 @@ class scan(scan_base):
             if self.experiment not in ['microwave', 'volt', 'time']:
                 print(f'{Fore.RED}WARNING{Fore.RESET}: New type of experiment {Fore.RED}{self.experiment}{Fore.RESET} using settings for generic')
                 self.experiment = 'generic'
-     
+        
+        
         self.build_database()
 
-    def build_database(self):
-        # Load data into Pandas data frame
-        self.df = pd.DataFrame.from_records(self.dset, columns=self.dset.dtype.fields.keys())
 
+    def build_database(self):
+        self.df = pd.DataFrame.from_records(self.dset, columns=self.dset.dtype.fields.keys())
         # Check if data is multidimensional.
         x2 =  list(set(self.df['v1']))
         if len(x2) > 1:
@@ -173,14 +246,21 @@ class scan(scan_base):
         self.calculate_signal_error()
         # Group data points by x (v0) and calculate mean, and apply baseline if appropiate
         self.process_signal()
-        
+
+    def filter(self, m):
+        self.load_database()
+        self.evaluate_windows()
+        self.basic_filter(m)
+        self.build_database()
+
+
     def calculate_signal_error(self):
         """Calculate error of data points using standard error and error propogation
         """
         # Check if averages have been given
         if self.averages != None:
             df = self.df
-            df['error'] = np.sqrt(0.25/self.averages) * 1/(np.sqrt(self.numloops))
+            df['error'] = np.sqrt(0.01/self.averages) * 1/(np.sqrt(self.numloops))
             # 0.25 comes from the maximum error from bernoulli trials (so an overestimate of the error - seeems reasonable-ish)
     
     def plot_trace(self, ind):
@@ -202,9 +282,7 @@ class scanmd(scan):
         super().__post_init__()
         
     def build_database(self):
-        # Load data into Pandas data frame
         self.df = pd.DataFrame.from_records(self.dset, columns=self.dset.dtype.fields.keys())
-
         # Generate signal data from windows
         self.evaluate_windows()
 
@@ -229,7 +307,6 @@ class abstract_fitting:
         self.guess : np.ndarray
         self.bounds = 0
         self.sigma = []
-        self.fitdone = False
         
     @staticmethod
     def func(x):
@@ -288,9 +365,8 @@ class Rabi(abstract_fitting):
         self.scan = scan
         self.sigma = self.scan.error
         fftGuess = self.fft_guess()
-        self.guess = [fftGuess["omega"], 0, fftGuess["amp"], fftGuess["offset"]]
-        
-        #self.bounds = [[0, 0, 0, -np.inf], [np.inf, np.inf, np.inf, np.inf]]
+        self.guess = [fftGuess["omega"], 0, fftGuess["amp"]]
+        self.bounds = [[0, 0, 0], [np.inf, np.inf, np.inf]]
     
     def fft_guess(self):
         '''Fit sin to the input time sequence, and return fitting parameters "amp", "omega", "phase", "offset", "freq", "period" and "fitfunc"'''
@@ -300,14 +376,28 @@ class Rabi(abstract_fitting):
         Fyy = abs(np.fft.fft(yy))
         guess_freq = abs(ff[np.argmax(Fyy[1:])+1])   # excluding the zero frequency "peak", which is related to offset
         guess_amp = np.std(yy) * 2.**0.5
-        guess_offset = np.mean(yy)
-        guess = np.array([guess_amp, 2.*np.pi*guess_freq, 0., guess_offset])
-        return {"amp": guess_amp, "omega": guess_freq, "offset": guess_offset}
-        
+
+        guess = np.array([guess_amp, 2.*np.pi*guess_freq, 0])
+        return {"amp": guess_amp, "omega": guess_freq}
+
+    def perform_fit(self, userGuess=None):
+        # Fit gaussian function
+        if userGuess != None:
+            self.guess = userGuess
+        scan = self.scan
+        p = self.guess
+        if len(self.sigma) >  1:
+            self._p0, self._varMatrix = curve_fit(self.func, scan.x, scan.y - scan.y[0], p0=p, absolute_sigma=True, sigma=scan.error)
+        else:
+            if self.bounds == 0:
+                self._p0, self._varMatrix = curve_fit(self.func, scan.x, scan.y - scan.y[0], p0=p, absolute_sigma=False)
+            else:
+                self._p0, self._varMatrix = curve_fit(self.func, scan.x, scan.y - scan.y[0], p0=p, bounds=self.bounds, absolute_sigma=False)      
+    
     @staticmethod
     def func(x, *p):
-        omega, decay, a, c = p
-        return -a*np.cos(x*omega)*np.exp(-decay*x)+c
+        omega, decay, a = p
+        return a*(1-np.cos(x*omega)*np.exp(-decay*x))
     
 if __name__ == '__main__':
     function = 'a0'
@@ -318,6 +408,8 @@ if __name__ == '__main__':
     #print(sc.rabi.p0()[0])
     filepath = 'tests/20221208_006_scan.h5'
     
-    sc = scanmd(filepath, function)
-    sc = scanmd(filepath, function)
-    sc = scanmd(filepath, function)
+    scs = scanmd(filepath, function)
+    #sc.remove_unstable(-0.02)
+    sc = scs.sets[-1]
+    sc.plot_stability(0.012,'(a1-a0)+(a2-a0)')
+    sc.remove_unstable(0.012, customfunction='(a1-a0)+(a2-a0)')
