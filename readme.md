@@ -89,6 +89,20 @@ It is also possible to return the values predicted by the model.
 ```
 ![gauss_fit_example.png](gauss_fit_example.png)
 
+### Rabi
+$$
+A [1 - \cos( \omega t)] \,e^{-t/T_2}/2
+$$
+The fitting routine is performed subtracting the first element of scan.y from y, such that the oscillation starts at the origin.
+
+`p0()` is returned in the order: `[omega, t2, A]`
+
+```
+>>> sc = scan(filename, function)
+>>> plt.errorbar(sc.x, (sc.y-sc.y[0])/sc.rabi.p0[2], sc.error, ls='none', marker='x', markersize=3, elinewidth=1,alpha=0.7)
+>>> plt.plot(sc.x*10**6, (sc.rabi.func(sc.x, *sc.rabi.p0))/sc.rabi.p0[2], label='fit')
+```
+![rabi_fit_example.png](rabi_fit_example.png)
 
 ## Two Dimensional Scans
 It is possible to perform measurements in two dimensions - with a range of values in both `v0` and `v1`. For this type of analysis use the `scanmd` object. This object builds a list (`scanmd.sets`) of `scan` objects for each dataset associated with independent values of `v1`.  Each `scan` object contains the values of `v0` accessible through `scanmd.sets[0].x` as well as the associated `v1` value accessible through `scanmd.set[0].x2`.
