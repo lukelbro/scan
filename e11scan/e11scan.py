@@ -260,7 +260,7 @@ class scan(scan_base):
         # Check if averages have been given
         if self.averages != None:
             df = self.df
-            df['error'] = np.sqrt(1/self.averages) * 1/(np.sqrt(self.numloops))
+            df['error'] = np.sqrt(0.01/self.averages) * 1/(np.sqrt(self.numloops))
             # 0.25 comes from the maximum error from bernoulli trials (so an overestimate of the error - seeems reasonable-ish)
     
     def plot_trace(self, ind):
@@ -366,8 +366,8 @@ class Rabi(abstract_fitting):
         self.sigma = self.scan.error
         fftGuess = self.fft_guess()
         self.guess = [fftGuess["omega"], 0, fftGuess["amp"], fftGuess["offset"]]
-        
-        #self.bounds = [[0, 0, 0, -np.inf], [np.inf, np.inf, np.inf, np.inf]]
+
+        self.bounds = [[0, 0, 0, self.scan.y[0]], [np.inf, np.inf, np.inf, self.scan.y[0] ]]
     
     def fft_guess(self):
         '''Fit sin to the input time sequence, and return fitting parameters "amp", "omega", "phase", "offset", "freq", "period" and "fitfunc"'''
@@ -384,7 +384,7 @@ class Rabi(abstract_fitting):
     @staticmethod
     def func(x, *p):
         omega, decay, a, c = p
-        return -a*np.cos(x*omega)*np.exp(-decay*x)+c
+        return a*(1-np.cos(x*omega)*np.exp(-decay*x))+c
     
 if __name__ == '__main__':
     function = 'a0'
