@@ -5,7 +5,6 @@ import h5py
 import pandas as pd
 import numpy as np
 from scipy.optimize import curve_fit
-from functools import cache, singledispatch
 from colorama import Fore
 from matplotlib import pyplot as plt
 
