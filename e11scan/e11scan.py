@@ -195,7 +195,7 @@ class scan(scan_base):
 
         # Load data from hdf5 file
         try:
-            self.f = h5py.File(self.filename, 'r')
+            self.f = h5py.File(self.filename, 'r', swmr=True)
             self.dset = self.f['analysis']
         except:
             raise ValueError('File or dataset not found')
