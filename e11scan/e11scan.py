@@ -29,7 +29,6 @@ class scan_base:
 
     def __post_init__(self):
         self.filterTracker = {'filterBool' : False, 'filters' : {'basicm': None, 'stablem': None }}
-        
 
     def evaluate_windows(self):
         # convert input string i.e a0 + a1 into something python can evaluate
@@ -200,11 +199,20 @@ class scan(scan_base):
         except:
             raise ValueError('File or dataset not found')
         
+        # Read t0
+        self.t0 = self.f['osc_0'].attrs['t0']
+
         # Read locations of windows
         self.windows = {}
+        self._windowsind = {}
         windows = ['A', 'B', 'C', 'D', 'E', 'F']
+
+        signal_0 = self.f['osc_0'][0]
+        dt = self.f['osc_0'].attrs['dt']
+        self.tt = np.linspace(self.t0, self.t0+dt*len(signal_0), len(signal_0))
         for window in windows:
-            self.windows[window] = self.dset.attrs[window]
+            self.windows[window] = self.dset.attrs[window] + self.t0
+            self._windowsind[window] = np.abs(self.tt-self.windows[window]).argmin() # find index of windows
 
         # Read time stamp
         self.timestamp = np.datetime64(self.f.attrs['timestamp'])
@@ -230,7 +238,6 @@ class scan(scan_base):
         
         
         self.build_database()
-
 
     def build_database(self):
         self.df = pd.DataFrame.from_records(self.dset, columns=self.dset.dtype.fields.keys())
@@ -272,11 +279,47 @@ class scan(scan_base):
         maxval = np.max(signal)
         color = {'A': 'tab:pink', 'B':'tab:green', 'C': 'tab:red', 'D':'tab:orange', 'E':'tab:purple', 'F':'tab:olive'}
         for key in self.windows.keys():
-            plt.vlines(self.windows[key]+self.f['osc_0'].attrs['t0'], minval, maxval, label=key, color=[str(color[key])])
+            plt.vlines(self.windows[key], minval, maxval, label=key, color=[str(color[key])], linewidth=0.5)
         plt.legend()
 
-class scanmd(scan):
+    @property
+    def windowsind(self):
+        return self._windowsind
 
+    @windowsind.setter
+    def windowsind(self, new_windows):
+        if not isinstance(new_windows, dict):
+            raise ValueError("Value must be a dict.")
+        # update window times
+        for key in new_windows.keys():
+            ind = new_windows[key]
+            self._windowsind[key] = ind
+            
+            new_window_time = self.tt[ind]
+            self.windows[key] = new_window_time
+        
+        # update database
+        indA = self._windowsind['A']
+        indB = self._windowsind['B']
+        indC = self._windowsind['C']
+        indD = self._windowsind['D']
+        indE = self._windowsind['E']
+        indF = self._windowsind['F']
+
+        for i in range(len(self.df['a0'])):
+            time, signal = self.trace(i)
+            self.df['a0'][i] = np.average(signal[indA:indB])
+            self.df['a1'][i] = np.average(signal[indC:indD])
+            self.df['a2'][i] = np.average(signal[indE:indF])
+        
+        # Generate signal data from windows
+        self.evaluate_windows()
+        # Calculate error on db
+        self.calculate_signal_error()
+        # Group data points by x (v0) and calculate mean, and apply baseline if appropiate
+        self.process_signal()
+
+class scanmd(scan):
     def __post_init__(self):
         super().__post_init__()
         

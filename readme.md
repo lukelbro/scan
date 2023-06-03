@@ -116,6 +116,25 @@ It is possible to perform measurements in two dimensions - with a range of value
 >>>    plt.plot(sc.x, sc.y, label = sc.x2)
 ```
 
+## Changing windows
+The position of the windows can be changed by defining a new set of indices for the window locations. An example of checking the current window locations, changing the window locations, and viewing the updated locations is shown below. The new window locations are not written to file.
+
+```
+>>> sc.windowsind
+{'A': 201, 'B': 257, 'C': 368, 'D': 439, 'E': 478, 'F': 542}
+
+>>> sc.plot_trace(0) # Check current windows
+
+>>> windows = {'A': 210, 'B': 247} # Define new windows
+
+>>> sc.windowsind  = windows
+
+>>> sc.plot_trace(0) # Check new windows
+```
+
+
+
+
 ## Error Calculation
 For a full calculation of the error the distribution functions of the states must be known. If the states do not overlap then a calculation of the standard error of each data point can be estimated. To calculate the standard error the standard deviation of each measurement must be known.
 

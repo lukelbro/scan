@@ -118,3 +118,21 @@ def test_scanmd_gauss():
        2.43326755e-27, 4.06274944e-28])
 
 
+def test_scan_windows_ind():
+    filename = 'tests/20210707_005_scan.h5'
+    function = '-(a0 - a1)/((a0 - a1) + (a0 - a2))'
+    sc = e11scan.scan(filename = filename, function = function)
+    
+    expected_ind = {'A': 201, 'B': 257, 'C': 368, 'D': 439, 'E': 478, 'F': 542}
+    assert sc.windowsind == expected_ind
+
+def test_scan_set_windows_ind():
+    filename = 'tests/20210707_005_scan.h5'
+    function = '-(a0 - a1)/((a0 - a1) + (a0 - a2))'
+    sc = e11scan.scan(filename = filename, function = function)
+    
+    set_ind = {'A': 201, 'B': 257, 'C': 368, 'D': 439, 'E': 478, 'F': 542}
+    
+    sc.windowsind = set_ind
+
+    assert sc.df['a0'][0] == -0.4693715081171429
