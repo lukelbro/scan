@@ -358,37 +358,44 @@ class abstract_fitting:
     def func(x):
         return
     
-    def perform_fit(self, userGuess=None):
+    def perform_fit(self, userGuess=None, useAllData=False):
+        if useAllData == True:
+            x = self.scan.xall
+            y = self.scan.yall
+        if useAllData == False:
+            x = self.scan.x
+            y = self.scan.y
+            
         # Fit gaussian function
         if userGuess != None:
             self.guess = userGuess
         scan = self.scan
         p = self.guess
         if len(self.sigma) >  1:
-            self._p0, self._varMatrix = curve_fit(self.func, scan.x, scan.y, p0=p, absolute_sigma=True, sigma=scan.error)
+            self._p0, self._varMatrix = curve_fit(self.func, x, y, p0=p, absolute_sigma=True, sigma=scan.error)
         else:
             if self.bounds == 0:
-                self._p0, self._varMatrix = curve_fit(self.func, scan.x, scan.y, p0=p, absolute_sigma=False)
+                self._p0, self._varMatrix = curve_fit(self.func, x, y, p0=p, absolute_sigma=False)
             else:
-                self._p0, self._varMatrix = curve_fit(self.func, scan.x, scan.y, p0=p, bounds=self.bounds, absolute_sigma=False)  
+                self._p0, self._varMatrix = curve_fit(self.func, x, y, p0=p, bounds=self.bounds, absolute_sigma=False)  
     @property
-    def p0(self):
-        self.perform_fit()
+    def p0(self, useAllData=False):
+        self.perform_fit(useAllData=useAllData)
         return self._p0
     
     @property
-    def varMatrix(self):
+    def varMatrix(self, useAllData=False):
         self.perform_fit()
         return self._varMatrix
     
     @property
-    def fit(self):
+    def fit(self, useAllData=False):
         """
         Return y values predicted by the fitted model for the scan.x values.
         Returns:
             np.array : y values predicted by model
         """
-        self.perform_fit()
+        self.perform_fit(useAllData=useAllData)
         x = self.scan.x
         y = self.func(x, *self.p0)
         return y
