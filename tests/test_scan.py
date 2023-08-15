@@ -136,3 +136,21 @@ def test_scan_set_windows_ind():
     sc.windowsind = set_ind
 
     assert sc.df['a0'][0] == -0.4693715081171429
+
+
+def test_scan_sc_xall():
+    filename = 'tests/20210707_005_scan.h5'
+    function = '-(a0 - a1)/((a0 - a1) + (a0 - a2))'
+    sc = e11scan.scan(filename = filename, function = function)
+    assert sc.xall[0] == sc.df['v0'][0]
+
+def test_scan_scs_xall():
+    filename = 'tests/20230531_012_scan.h5'
+    function = '(a0 - a1)'
+    scs = e11scan.scanmd(filename=filename, function= function, experiment = 'microwave')
+    for sc in scs.sets:
+        if sc.x2 == 0.45:
+            sc_single =  sc
+    sc = sc_single
+    assert sc.xall[0] == sc.df['v0'].values[0]
+

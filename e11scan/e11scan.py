@@ -59,13 +59,14 @@ class scan_base:
         else:
             raise ValueError(f'Experiment {self.experiment} not recognised')
     
-        self.y = np.array((dfmean['signal'] - self.baseValue).to_list())
-        self.x = np.array(dfmean['signal'].keys().to_list())
+        self.y = dfmean['signal'].values - self.baseValue
+        self.x = dfmean['signal'].keys()
+
         self._x_orignal = self.x.copy()
         self._y_orignal = self.y.copy()
 
-        self.yall =  np.array((self.df['signal'] - self.baseValue).to_list())
-        self.xall = np.array((self.df['v0'].to_list()))
+        self.yall = self.df['signal'].values - self.baseValue
+        self.xall = self.df['v0'].values
 
         if self.averages != None:
             self.error = np.array(dfmean['error'])
