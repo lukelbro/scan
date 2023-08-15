@@ -373,12 +373,12 @@ class abstract_fitting:
         scan = self.scan
         p = self.guess
         if len(self.sigma) >  1:
-            self._p0, self._varMatrix = curve_fit(self.func, x, scan.y, p0=p, absolute_sigma=True, sigma=scan.error)
+            self._p0, self._varMatrix = curve_fit(self.func, x, y, p0=p, absolute_sigma=True, sigma=scan.error)
         else:
             if self.bounds == 0:
-                self._p0, self._varMatrix = curve_fit(self.func, x, scan.y, p0=p, absolute_sigma=False)
+                self._p0, self._varMatrix = curve_fit(self.func, x, y, p0=p, absolute_sigma=False)
             else:
-                self._p0, self._varMatrix = curve_fit(self.func, x, scan.y, p0=p, bounds=self.bounds, absolute_sigma=False)  
+                self._p0, self._varMatrix = curve_fit(self.func, x, y, p0=p, bounds=self.bounds, absolute_sigma=False)  
     @property
     def p0(self):
         self.perform_fit()
