@@ -64,6 +64,9 @@ class scan_base:
         self._x_orignal = self.x.copy()
         self._y_orignal = self.y.copy()
 
+        self.xall =  np.array((self.df['signal'] - self.baseValue).to_list())
+        self.yall = np.array((self.df['signal'].keys().to_list()))
+
         if self.averages != None:
             self.error = np.array(dfmean['error'])
         

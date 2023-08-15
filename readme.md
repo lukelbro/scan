@@ -31,6 +31,13 @@ Change the evaluation function:
 >>> sc.update_function(function)
 ```
 
+Accessing data:
+- Independent variable: `sc.x`
+- Dependent variable: `sc.y`
+- Without averaging:
+    - Independent variable: `sc.xall`
+    - Dependent variable: `sc.yall`
+
 Access an individual trace:
 ```
 times, signal = sc.trace(index)
