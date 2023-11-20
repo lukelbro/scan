@@ -400,6 +400,20 @@ class abstract_fitting:
         x = self.scan.x
         y = self.func(x, *self.p0)
         return y
+    
+    def fit_interpolated(self, interpolation = 100):
+        """
+        Return y values predicted by the fitted model for the scan.x values.
+        Returns:
+            (np.array, np.array) : x and y values predicted by model
+        """
+        self.perform_fit()
+
+        num_points = len(self.scan.x)*interpolation
+        x = np.linspace(self.scan.x[0], self.scan.x[-1], num_points)
+        y = self.func(x, *self.p0)
+        return x, y
+
 
 class Gauss(abstract_fitting):
     def __init__(self, scan):

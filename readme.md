@@ -113,6 +113,15 @@ The fitting routine is performed subtracting the first element of scan.y from y,
 ```
 ![rabi_fit_example.png](rabi_fit_example.png)
 
+### Interpolation
+All fitting routines can be used to interpolate the data. The interpolated fit can be accessed using `sc.gauss.fit_interpolated(interpolation = 100)` or `sc.rabi.fit_interpolated(interpolation=100)`. Where the interpolation is the factor by which the number of points is increased. The default interpolation is 100.
+
+```
+>>> x,y = sc.gauss_fit_interpolated()
+```
+
+``` 
+
 ## Two Dimensional Scans
 It is possible to perform measurements in two dimensions - with a range of values in both `v0` and `v1`. For this type of analysis use the `scanmd` object. This object builds a list (`scanmd.sets`) of `scan` objects for each dataset associated with independent values of `v1`.  Each `scan` object contains the values of `v0` accessible through `scanmd.sets[0].x` as well as the associated `v1` value accessible through `scanmd.set[0].x2`.
 
