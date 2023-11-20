@@ -120,7 +120,7 @@ All fitting routines can be used to interpolate the data. The interpolated fit c
 >>> x,y = sc.gauss_fit_interpolated()
 ```
 
-``` 
+
 
 ## Two Dimensional Scans
 It is possible to perform measurements in two dimensions - with a range of values in both `v0` and `v1`. For this type of analysis use the `scanmd` object. This object builds a list (`scanmd.sets`) of `scan` objects for each dataset associated with independent values of `v1`.  Each `scan` object contains the values of `v0` accessible through `scanmd.sets[0].x` as well as the associated `v1` value accessible through `scanmd.set[0].x2`.
