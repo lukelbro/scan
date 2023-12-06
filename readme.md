@@ -67,7 +67,7 @@ Plot the stability of the signal:
 ```
 ![stability_example.png](stability_example.png)
 
-By default, the function `a0 - a1` is used. A custom function can also be used e.g `sc.plot_stability(a0-a2)`
+By default, the function `a0 - a1` is used. A custom function can also be used e.g `sc.plot_stability(customfunction = a0-a2)`
 
 ## Fitting Routines
 Basic fitting routines for fitting oscillatory data and Gaussian peaks are included. The best fit values `p0` and variance matrix `varMatrix` can be accessed through a scan object i.e.
