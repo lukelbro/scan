@@ -235,6 +235,7 @@ class scan(scan_base):
             window2 = self._windowsind['F']
             self._windowsind['E'] = window2
             self._windowsind['F'] = window1
+        
 
         # Read time stamp
         self.timestamp = np.datetime64(self.f.attrs['timestamp'])
@@ -318,7 +319,7 @@ class scan(scan_base):
         for i in range(len(self.df['a0'])):
             time, signal = self.trace(i)
             background_reference = signal[:splitpoint]
-            background_predicted = model.predict(background_reference)
+            background_predicted = model.predict(np.array([background_reference]))
             signal = signal - background_predicted
             self.df['a0'][i] = np.average(signal[indA:indB])
             self.df['a1'][i] = np.average(signal[indC:indD])
