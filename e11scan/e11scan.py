@@ -407,10 +407,11 @@ class scanmd(scan):
         for i in range(len(self.df['a0'])):
             time, signal = self.trace(i)
             background_reference = signal[:splitpoint]
-            background_predicted = model.predict(np.array([background_reference]))
+            background_predicted = model.predict(np.array([background_reference]))[0]
             
-            time, signal = self.trace(i)
-            signal = signal - background_predicted[0]
+            background_predicted = np.concatenate(background_reference, background_predicted)
+
+            signal = signal - background_predicted
             self.df['a0'][i] = np.average(signal[indA:indB])
             self.df['a1'][i] = np.average(signal[indC:indD])
             self.df['a2'][i] = np.average(signal[indE:indF])
