@@ -218,11 +218,32 @@ class scan(scan_base):
             self.windows[window] = self.dset.attrs[window] + self.t0
             self._windowsind[window] = np.abs(self.tt-self.windows[window]).argmin() # find index of windows
 
+        if self._windowsind['A'] > self._windowsind['B']:
+            window1 = self._windowsind['A']
+            window2 = self._windowsind['B']
+            self._windowsind['A'] = window2
+            self._windowsind['B'] = window1
+        
+        if self._windowsind['C'] > self._windowsind['D']:
+            window1 = self._windowsind['C']
+            window2 = self._windowsind['D']
+            self._windowsind['C'] = window2
+            self._windowsind['D'] = window1
+        
+        if self._windowsind['E'] > self._windowsind['F']:
+            window1 = self._windowsind['E']
+            window2 = self._windowsind['F']
+            self._windowsind['E'] = window2
+            self._windowsind['F'] = window1
+
         # Read time stamp
         self.timestamp = np.datetime64(self.f.attrs['timestamp'])
         
         # Read number of loops
         self.numloops = self.f.attrs['v0_loops']
+
+        # Read number of traces
+        self.numtraces = len(self.f['osc_0'])
 
         # read experiment type from metadata
         if self.experiment == None:
@@ -285,6 +306,30 @@ class scan(scan_base):
         for key in self.windows.keys():
             plt.vlines(self.windows[key], minval, maxval, label=key, color=[str(color[key])], linewidth=0.5)
         plt.legend()
+
+    def load_background(self, model, splitpoint): 
+        indA = self._windowsind['A']
+        indB = self._windowsind['B']
+        indC = self._windowsind['C']
+        indD = self._windowsind['D']
+        indE = self._windowsind['E']
+        indF = self._windowsind['F']
+
+        for i in range(len(self.df['a0'])):
+            time, signal = self.trace(i)
+            background_reference = signal[:splitpoint]
+            background_predicted = model.predict(background_reference)
+            signal = signal - background_predicted
+            self.df['a0'][i] = np.average(signal[indA:indB])
+            self.df['a1'][i] = np.average(signal[indC:indD])
+            self.df['a2'][i] = np.average(signal[indE:indF])
+        
+        # Generate signal data from windows
+        self.evaluate_windows()
+        # Calculate error on db
+        self.calculate_signal_error()
+        # Group data points by x (v0) and calculate mean, and apply baseline if appropiate
+        self.process_signal()
 
     @property
     def windowsind(self):
