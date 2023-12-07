@@ -381,11 +381,14 @@ class scanmd(scan):
         self.evaluate_windows()
 
         self.calculate_signal_error()
+    
+        self.generate_sets()
+
+    def generate_sets(self):  
         # Check if data is multidimensional.
         self.x2 =  list(set(self.df['v1']))
         self.x2.sort()
-        self.sets = []
-        
+        self.sets = []  
         for val in self.x2:
             dfval = self.df[self.df['v1'] == val]
             sc = scan_base(experiment = self.experiment, df=dfval, x2 = val, function = self.function, filename = self.filename, averages=self.averages)
@@ -393,6 +396,30 @@ class scanmd(scan):
             sc.process_signal()
             self.sets.append(sc)
     
+    def load_background(self, model, splitpoint): 
+        indA = self._windowsind['A']
+        indB = self._windowsind['B']
+        indC = self._windowsind['C']
+        indD = self._windowsind['D']
+        indE = self._windowsind['E']
+        indF = self._windowsind['F']
+
+        for i in range(len(self.df['a0'])):
+            time, signal = self.trace(i)
+            background_reference = signal[:splitpoint]
+            background_predicted = model.predict(np.array([background_reference]))
+            signal = signal - background_predicted
+            self.df['a0'][i] = np.average(signal[indA:indB])
+            self.df['a1'][i] = np.average(signal[indC:indD])
+            self.df['a2'][i] = np.average(signal[indE:indF])
+        
+        # Generate signal data from windows
+        self.evaluate_windows()
+        # Calculate error on db
+        self.calculate_signal_error()
+        
+        self.generate_sets()
+
 class abstract_fitting:
     def __init__(self):
         self._p0 : np.ndarray
