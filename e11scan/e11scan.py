@@ -409,7 +409,7 @@ class scanmd(scan):
             background_reference = signal[:splitpoint]
             background_predicted = model.predict(np.array([background_reference]))[0]
             
-            background_predicted = np.concatenate(background_reference, background_predicted)
+            background_predicted = np.concatenate((background_reference, background_predicted))
 
             signal = signal - background_predicted
             self.df['a0'][i] = np.average(signal[indA:indB])
