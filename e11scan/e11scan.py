@@ -263,8 +263,8 @@ class scan(scan_base):
                 print(f'{Fore.RED}WARNING{Fore.RESET}: New type of experiment {Fore.RED}{self.experiment}{Fore.RESET} using settings for generic')
                 self.experiment = 'generic'
         
-        
         self.build_database()
+
 
     def build_database(self):
         self.df = pd.DataFrame.from_records(self.dset, columns=self.dset.dtype.fields.keys())
@@ -346,6 +346,8 @@ class scan(scan_base):
         # Group data points by x (v0) and calculate mean, and apply baseline if appropiate
         self.process_signal()
     
+
+        
     def load_background(self, model, splitpoint): 
         indA = self._windowsind['A']
         indB = self._windowsind['B']
@@ -357,7 +359,10 @@ class scan(scan_base):
         for i in range(len(self.df['a0'])):
             time, signal = self.trace(i)
             background_reference = signal[:splitpoint]
-            background_predicted = model.predict(np.array([background_reference]))
+            background_predicted = model.predict(np.array([background_reference]))[0]
+            
+            background_predicted = np.concatenate((background_reference, background_predicted))
+
             signal = signal - background_predicted
             self.df['a0'][i] = np.average(signal[indA:indB])
             self.df['a1'][i] = np.average(signal[indC:indD])
@@ -369,7 +374,6 @@ class scan(scan_base):
         self.calculate_signal_error()
         # Group data points by x (v0) and calculate mean, and apply baseline if appropiate
         self.process_signal()
-
         
 class scanmd(scan):
     def __post_init__(self):
