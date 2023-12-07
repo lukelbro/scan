@@ -408,6 +408,8 @@ class scanmd(scan):
             time, signal = self.trace(i)
             background_reference = signal[:splitpoint]
             background_predicted = model.predict(np.array([background_reference]))
+            
+            time, signal = self.trace(i)
             signal = signal - background_predicted[0]
             self.df['a0'][i] = np.average(signal[indA:indB])
             self.df['a1'][i] = np.average(signal[indC:indD])
