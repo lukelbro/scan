@@ -386,7 +386,7 @@ class scanmd(scan):
         
         for val in self.x2:
             dfval = self.df[self.df['v1'] == val]
-            sc = scan_base(experiment = self.experiment, df=dfval, x2 = val, function = self.function, filename = self.filename, averages=self.averages)
+            sc = scan(experiment = self.experiment, df=dfval, x2 = val, function = self.function, filename = self.filename, averages=self.averages)
             # Group data points by x (v0) and calculate mean, and apply baseline if appropiate
             sc.process_signal()
             self.sets.append(sc)
