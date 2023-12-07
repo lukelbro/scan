@@ -159,30 +159,6 @@ class scan_base:
             plt.hlines(hline, 0, stability.shape[0])
         plt.ylabel(customfunction)
     
-    def load_background(self, model, splitpoint): 
-        indA = self._windowsind['A']
-        indB = self._windowsind['B']
-        indC = self._windowsind['C']
-        indD = self._windowsind['D']
-        indE = self._windowsind['E']
-        indF = self._windowsind['F']
-
-        for i in range(len(self.df['a0'])):
-            time, signal = self.trace(i)
-            background_reference = signal[:splitpoint]
-            background_predicted = model.predict(np.array([background_reference]))
-            signal = signal - background_predicted
-            self.df['a0'][i] = np.average(signal[indA:indB])
-            self.df['a1'][i] = np.average(signal[indC:indD])
-            self.df['a2'][i] = np.average(signal[indE:indF])
-        
-        # Generate signal data from windows
-        self.evaluate_windows()
-        # Calculate error on db
-        self.calculate_signal_error()
-        # Group data points by x (v0) and calculate mean, and apply baseline if appropiate
-        self.process_signal()
-
 
     def trace(self, ind):
         if ind>len(self.f['osc_0']):
@@ -369,7 +345,32 @@ class scan(scan_base):
         self.calculate_signal_error()
         # Group data points by x (v0) and calculate mean, and apply baseline if appropiate
         self.process_signal()
+    
+    def load_background(self, model, splitpoint): 
+        indA = self._windowsind['A']
+        indB = self._windowsind['B']
+        indC = self._windowsind['C']
+        indD = self._windowsind['D']
+        indE = self._windowsind['E']
+        indF = self._windowsind['F']
 
+        for i in range(len(self.df['a0'])):
+            time, signal = self.trace(i)
+            background_reference = signal[:splitpoint]
+            background_predicted = model.predict(np.array([background_reference]))
+            signal = signal - background_predicted
+            self.df['a0'][i] = np.average(signal[indA:indB])
+            self.df['a1'][i] = np.average(signal[indC:indD])
+            self.df['a2'][i] = np.average(signal[indE:indF])
+        
+        # Generate signal data from windows
+        self.evaluate_windows()
+        # Calculate error on db
+        self.calculate_signal_error()
+        # Group data points by x (v0) and calculate mean, and apply baseline if appropiate
+        self.process_signal()
+
+        
 class scanmd(scan):
     def __post_init__(self):
         super().__post_init__()
