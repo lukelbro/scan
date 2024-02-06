@@ -335,9 +335,9 @@ class scan(scan_base):
 
         for i in range(len(self.df['a0'])):
             time, signal = self.trace(i)
-            self.df['a0'][i] = np.average(signal[indA:indB])
-            self.df['a1'][i] = np.average(signal[indC:indD])
-            self.df['a2'][i] = np.average(signal[indE:indF])
+            self.df['a0'][i] = np.average(signal[slice(*sorted([indA, indB]))])
+            self.df['a1'][i] = np.average(signal[slice(*sorted([indC, indD]))])
+            self.df['a2'][i] = np.average(signal[slice(*sorted([indE, indF]))])
         
         # Generate signal data from windows
         self.evaluate_windows()
