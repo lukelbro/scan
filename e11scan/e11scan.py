@@ -143,6 +143,11 @@ class scan_base:
             if value > threshold:
                 idrop.append(index)
         return idrop
+    
+    def get_stabilty(self, customfunction = 'a0-a1'):
+        functionstring = scan_base.function_parser(customfunction)
+        stability = eval(functionstring)
+        return stability
         
     def plot_stability(self, hline = None, customfunction = 'a0-a1'):
         """Plots the stability of the signal from a0 - a1
@@ -151,8 +156,7 @@ class scan_base:
             customfunction (str, optional): Option for custom function. Defaults to 'a0-a1'.
         """
         plt.clf()
-        functionstring = scan_base.function_parser(customfunction)
-        stability = eval(functionstring)
+        stability = self.get_stabilty(customfunction)
 
         plt.scatter(np.linspace(0, stability.shape[0], stability.shape[0]), stability, s=1)
         plt.xlabel('measurement number')
