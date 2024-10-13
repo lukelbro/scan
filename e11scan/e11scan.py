@@ -61,6 +61,7 @@ class scan_base:
     
         self.y = dfmean['signal'].values - self.baseValue
         self.x = dfmean['signal'].keys()
+        self.variance = self.df.groupby(['v0']).var()
 
         self._x_orignal = self.x.copy()
         self._y_orignal = self.y.copy()
