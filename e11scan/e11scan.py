@@ -144,7 +144,7 @@ class scan_base:
                 idrop.append(index)
         return idrop
     
-    def get_stabilty(self, customfunction = 'a0-a1'):
+    def get_stability(self, customfunction = 'a0-a1'):
         functionstring = scan_base.function_parser(customfunction)
         stability = eval(functionstring)
         return stability
@@ -156,7 +156,7 @@ class scan_base:
             customfunction (str, optional): Option for custom function. Defaults to 'a0-a1'.
         """
         plt.clf()
-        stability = self.get_stabilty(customfunction)
+        stability = self.get_stability(customfunction)
 
         plt.scatter(np.linspace(0, stability.shape[0], stability.shape[0]), stability, s=1)
         plt.xlabel('measurement number')
