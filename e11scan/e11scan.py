@@ -340,9 +340,9 @@ class scan(scan_base):
 
         for i in range(len(self.df['a0'])):
             time, signal = self.trace(i)
-            self.df['a0'][i] = np.sum(signal[slice(*sorted([indA, indB]))])
-            self.df['a1'][i] = np.sum(signal[slice(*sorted([indC, indD]))])
-            self.df['a2'][i] = np.sum(signal[slice(*sorted([indE, indF]))])
+            self.df['a0'][i] = np.mean(signal[slice(*sorted([indA, indB]))])
+            self.df['a1'][i] = np.mean(signal[slice(*sorted([indC, indD]))])
+            self.df['a2'][i] = np.mean(signal[slice(*sorted([indE, indF]))])
         
         # Generate signal data from windows
         self.evaluate_windows()
@@ -369,9 +369,9 @@ class scan(scan_base):
             background_predicted = np.concatenate((background_reference, background_predicted))
 
             signal = signal - background_predicted
-            self.df['a0'][i] = np.sum(signal[indA:indB])
-            self.df['a1'][i] = np.sum(signal[indC:indD])
-            self.df['a2'][i] = np.sum(signal[indE:indF])
+            self.df['a0'][i] = np.mean(signal[indA:indB])
+            self.df['a1'][i] = np.mean(signal[indC:indD])
+            self.df['a2'][i] = np.mean(signal[indE:indF])
         
         # Generate signal data from windows
         self.evaluate_windows()
@@ -527,7 +527,7 @@ class Rabi(abstract_fitting):
         '''Fit sin to the input time sequence, and return fitting parameters "amp", "omega", "phase", "offset", "freq", "period" and "fitfunc"'''
         tt = self.scan.x
         yy = self.scan.y
-        ff = np.fft.fftfreq(len(tt), (tt[1]-tt[0]))   # assume uniform spacing
+        ff = np.fft.fftfreq(len(tt), (tt[1]-tt[0]))   # asmeane uniform spacing
         Fyy = abs(np.fft.fft(yy))
         guess_freq = abs(ff[np.argmax(Fyy[1:])+1])   # excluding the zero frequency "peak", which is related to offset
         guess_amp = np.std(yy) * 2.**0.5
