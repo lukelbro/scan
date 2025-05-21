@@ -340,9 +340,9 @@ class scan(scan_base):
 
         for i in range(len(self.df['a0'])):
             time, signal = self.trace(i)
-            self.df['a0'][i] = np.average(signal[slice(*sorted([indA, indB]))])
-            self.df['a1'][i] = np.average(signal[slice(*sorted([indC, indD]))])
-            self.df['a2'][i] = np.average(signal[slice(*sorted([indE, indF]))])
+            self.df['a0'][i] = np.sum(signal[slice(*sorted([indA, indB]))])
+            self.df['a1'][i] = np.sum(signal[slice(*sorted([indC, indD]))])
+            self.df['a2'][i] = np.sum(signal[slice(*sorted([indE, indF]))])
         
         # Generate signal data from windows
         self.evaluate_windows()
@@ -369,9 +369,9 @@ class scan(scan_base):
             background_predicted = np.concatenate((background_reference, background_predicted))
 
             signal = signal - background_predicted
-            self.df['a0'][i] = np.average(signal[indA:indB])
-            self.df['a1'][i] = np.average(signal[indC:indD])
-            self.df['a2'][i] = np.average(signal[indE:indF])
+            self.df['a0'][i] = np.sum(signal[indA:indB])
+            self.df['a1'][i] = np.sum(signal[indC:indD])
+            self.df['a2'][i] = np.sum(signal[indE:indF])
         
         # Generate signal data from windows
         self.evaluate_windows()
