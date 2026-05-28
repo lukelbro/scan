@@ -5,6 +5,7 @@ import h5py
 import pandas as pd
 import numpy as np
 from scipy.optimize import curve_fit
+from scipy.signal import find_peaks
 from colorama import Fore
 from matplotlib import pyplot as plt
 
@@ -522,20 +523,20 @@ class GaussGauss(abstract_fitting):
         self.sigma = self.scan.error
         x = np.array(scan.x)
         y = np.array(scan.y)
-        # Guess for first peak: largest value
-        idx1 = np.argmax(y)
-        A1 = y[idx1]
-        mu1 = x[idx1]
         sigma_guess = (x[-1] - x[0]) / 8.0
-        # Guess for second peak: largest value after masking around first peak
-        mask_width = max(1, len(x) // 8)
-        masked_y = y.copy()
-        lo = max(0, idx1 - mask_width)
-        hi = min(len(y), idx1 + mask_width)
-        masked_y[lo:hi] = -np.inf
-        idx2 = np.argmax(masked_y)
-        A2 = y[idx2]
-        mu2 = x[idx2]
+        # Use scipy peak finding, sorted by prominence, to seed the two peaks
+        peaks, props = find_peaks(y, prominence=0)
+        if len(peaks) >= 2:
+            order = np.argsort(props['prominences'])[::-1]
+            idx1, idx2 = peaks[order[0]], peaks[order[1]]
+        elif len(peaks) == 1:
+            idx1 = peaks[0]
+            idx2 = np.argmax(y == np.partition(y, -2)[-2])  # second largest point
+        else:
+            idx1 = np.argmax(y)
+            idx2 = np.argmax(y == np.partition(y, -2)[-2])
+        A1, mu1 = y[idx1], x[idx1]
+        A2, mu2 = y[idx2], x[idx2]
         self.guess = [A1, mu1, sigma_guess, A2, mu2, sigma_guess]
 
     @staticmethod
