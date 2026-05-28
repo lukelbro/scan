@@ -83,6 +83,7 @@ class scan_base:
 
         # load fitting routines (does not do fit now)
         self.gauss = Gauss(self)
+        self.gaussgauss = GaussGauss(self)
         self.rabi = Rabi(self)
     
     def filter_manager(self, customfunction = 'a0-a1'):
@@ -513,6 +514,36 @@ class Gauss(abstract_fitting):
     def func(x, *p):
         A, mu, sigma = p
         return A * np.exp( - (x-mu)**2/(2.*sigma**2))
+
+class GaussGauss(abstract_fitting):
+    def __init__(self, scan):
+        super().__init__()
+        self.scan = scan
+        self.sigma = self.scan.error
+        x = np.array(scan.x)
+        y = np.array(scan.y)
+        # Guess for first peak: largest value
+        idx1 = np.argmax(y)
+        A1 = y[idx1]
+        mu1 = x[idx1]
+        sigma_guess = (x[-1] - x[0]) / 8.0
+        # Guess for second peak: largest value after masking around first peak
+        mask_width = max(1, len(x) // 8)
+        masked_y = y.copy()
+        lo = max(0, idx1 - mask_width)
+        hi = min(len(y), idx1 + mask_width)
+        masked_y[lo:hi] = -np.inf
+        idx2 = np.argmax(masked_y)
+        A2 = y[idx2]
+        mu2 = x[idx2]
+        self.guess = [A1, mu1, sigma_guess, A2, mu2, sigma_guess]
+
+    @staticmethod
+    def func(x, *p):
+        A1, mu1, sigma1, A2, mu2, sigma2 = p
+        return (A1 * np.exp(-(x - mu1)**2 / (2.0 * sigma1**2))
+                + A2 * np.exp(-(x - mu2)**2 / (2.0 * sigma2**2)))
+
 
 class Rabi(abstract_fitting):
     def __init__(self, scan):
