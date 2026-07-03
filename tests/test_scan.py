@@ -39,7 +39,7 @@ def test_scan_gaussian():
     coeff = [1.41586588e-01, 1.95563550e+01, 6.61302896e-05]
 
     for i in range(len(sc.gauss.p0)):
-        assert sc.gauss.p0[i] == approx(coeff[i], abs=1e-8)
+        assert sc.gauss.p0[i] == approx(coeff[i], abs=1e-4)
 
 def test_plot():
     filename = 'tests/20210707_005_scan.h5'

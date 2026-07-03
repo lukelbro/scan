@@ -1,6 +1,20 @@
 # Scan Data Object
 My personal library for working with data from the E11 lab. The data format used in the lab is HDF5. All the data from an experiment is included in this file, including metadata. The files can be read for analysis using the [h5py](https://www.h5py.org) library. A description of the Scan object is below as well as a reference section can be found below that outlines the structure of these files.
 
+## Architecture
+
+The library is structured into three modules:
+
+| Module | Purpose |
+|--------|---------|
+| `e11scan/core.py` | Pure functions: HDF5 loading, signal evaluation, baseline subtraction, filtering |
+| `e11scan/fitting.py` | Standalone fitting routines (Gaussian, double Gaussian, Rabi) — no HDF5 dependency |
+| `e11scan/main.py` | User-facing `Scan` and `ScanMD` classes with lazy-cached fit properties |
+
+All existing notebook code (`from e11scan import scan`) continues to work unchanged. Fitting is performed lazily on first property access and then cached — no fitting runs during object construction.
+
+## Quick Start
+
 How to use Scan object:
 ```
 from e11scan import scan

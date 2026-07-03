@@ -157,4 +157,6 @@ Temporary Items
 
 .vscode/*
 
+reports/
+
 scratch.ipynb
