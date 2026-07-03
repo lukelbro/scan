@@ -154,3 +154,239 @@ def test_scan_scs_xall():
     sc = sc_single
     assert sc.xall[0] == sc.df['v0'].values[0]
 
+
+# ------------------------------------------------------------------
+# Declarative filter V2 tests
+# ------------------------------------------------------------------
+
+def test_filter_rows_reversibility():
+    """Selecting a row range and then disabling it restores the full dataset."""
+    filename = 'tests/20210707_005_scan.h5'
+    function = '-(a0 - a1)/((a0 - a1) + (a0 - a2))'
+    sc = e11scan.scan(filename=filename, function=function)
+    original_len = len(sc.x)
+
+    # Select a middle slice (drop rows at both ends)
+    sc.filter_rows((10, 110))
+    assert len(sc.x) == 100
+
+    # Restore
+    sc.filter_rows(None)
+    assert len(sc.x) == original_len
+
+
+def test_basic_filter_reversibility():
+    """Applying basic_filter then disabling it restores removed points."""
+    filename = 'tests/20210707_005_scan.h5'
+    function = '-(a0 - a1)/((a0 - a1) + (a0 - a2))'
+    sc = e11scan.scan(filename=filename, function=function)
+    original_len = len(sc.x)
+    original_y = sc.y.copy()
+
+    # Filter
+    sc.basic_filter(1.5)
+    filtered_len = len(sc.x)
+    assert filtered_len <= original_len
+
+    # Restore
+    sc.basic_filter(None)
+    assert len(sc.x) == original_len
+    assert np.allclose(sc.y, original_y)
+
+
+def test_remove_unstable_reversibility():
+    """Applying remove_unstable then disabling it restores removed points."""
+    filename = 'tests/20210707_005_scan.h5'
+    function = '-(a0 - a1)/((a0 - a1) + (a0 - a2))'
+    sc = e11scan.scan(filename=filename, function=function)
+    original_len = len(sc.x)
+    original_y = sc.y.copy()
+
+    # Filter
+    sc.remove_unstable(0.01)
+    filtered_len = len(sc.x)
+    assert filtered_len <= original_len
+
+    # Restore
+    sc.remove_unstable(None)
+    assert len(sc.x) == original_len
+    assert np.allclose(sc.y, original_y)
+
+
+def test_filter_order_independence():
+    """Applying basic_filter then stability_filter yields same result as reverse order."""
+    filename = 'tests/20210707_005_scan.h5'
+    function = '-(a0 - a1)/((a0 - a1) + (a0 - a2))'
+
+    # Order A: basic_filter first
+    sc_a = e11scan.scan(filename=filename, function=function)
+    sc_a.basic_filter(1.5)
+    sc_a.remove_unstable(0.01)
+    x_a, y_a = sc_a.x.copy(), sc_a.y.copy()
+
+    # Order B: stability_filter first
+    sc_b = e11scan.scan(filename=filename, function=function)
+    sc_b.remove_unstable(0.01)
+    sc_b.basic_filter(1.5)
+    x_b, y_b = sc_b.x.copy(), sc_b.y.copy()
+
+    # Results must be identical (same length and values)
+    assert len(x_a) == len(x_b)
+    assert np.allclose(x_a, x_b)
+    assert np.allclose(y_a, y_b)
+
+
+def test_filter_cache_invalidation():
+    """Accessing a fit cache, then filtering, must trigger recomputation."""
+    filename = 'tests/20210707_005_scan.h5'
+    function = '-(a0 - a1)/((a0 - a1) + (a0 - a2))'
+    sc = e11scan.scan(filename=filename, function=function)
+
+    # Force cache population
+    gauss_before = sc.gauss
+    assert sc._gauss_cache is not None
+
+    # Apply filter — cache must be invalidated
+    sc.basic_filter(1.5)
+    assert sc._gauss_cache is None
+
+    # Re-access triggers recomputation
+    gauss_after = sc.gauss
+    assert sc._gauss_cache is not None
+    # The fit results should differ because the data changed
+    assert gauss_before.p0[0] != gauss_after.p0[0]
+
+
+def test_filter_drop_rows_reversibility():
+    """Dropping rows by index and then disabling the drop restores them."""
+    filename = 'tests/20210707_005_scan.h5'
+    function = '-(a0 - a1)/((a0 - a1) + (a0 - a2))'
+    sc = e11scan.scan(filename=filename, function=function)
+    original_df_len = len(sc.df)
+
+    # Drop rows 0, 1, 2 from the raw DataFrame
+    sc.filter_drop_rows([0, 1, 2])
+    assert len(sc.df) == original_df_len - 3
+
+    # Restore
+    sc.filter_drop_rows(None)
+    assert len(sc.df) == original_df_len
+
+
+def test_load_database_resets_filters():
+    """load_database() clears all declarative filter state."""
+    filename = 'tests/20210707_005_scan.h5'
+    function = '-(a0 - a1)/((a0 - a1) + (a0 - a2))'
+    sc = e11scan.scan(filename=filename, function=function)
+    original_len = len(sc.x)
+
+    # Apply filters
+    sc.filter_rows((0, 100))
+    sc.filter_drop_rows([5, 10])
+    sc.basic_filter(1.5)
+    sc.remove_unstable(0.01)
+
+    # Reload clears everything
+    sc.load_database()
+    assert sc.pipeline == []
+    assert len(sc.x) == original_len
+
+
+# ------------------------------------------------------------------
+# Pattern B pipeline API tests
+# ------------------------------------------------------------------
+
+def _load_scan():
+    """Shared fixture for pipeline tests."""
+    return e11scan.scan(
+        filename='tests/20210707_005_scan.h5',
+        function='-(a0 - a1)/((a0 - a1) + (a0 - a2))',
+    )
+
+
+def test_set_pipeline_basic():
+    """set_pipeline with a single filter step works and populates pipeline."""
+    sc = _load_scan()
+    sc.set_pipeline([('basic_filter', 1.5)])
+    assert len(sc.pipeline) == 1
+    assert sc.pipeline[0][0] == 'basic_filter'
+    assert sc.pipeline[0][1] == {'m': 1.5}
+
+
+def test_set_pipeline_with_dicts():
+    """set_pipeline accepts dict-style kwargs."""
+    sc = _load_scan()
+    sc.set_pipeline([('drop_rows', {'indices': [50, 150]})])
+    assert len(sc.pipeline) == 1
+    assert sc.pipeline[0] == ('drop_rows', {'indices': [50, 150]})
+
+
+def test_add_step_order():
+    """add_step with order= inserts at the correct position."""
+    sc = _load_scan()
+    sc.add_step('basic_filter', 1.5)
+    sc.add_step('drop_rows', [50, 150], order=0)
+    assert [name for name, _ in sc.pipeline] == ['drop_rows', 'basic_filter']
+
+
+def test_clear_pipeline_restores_data():
+    """clear_pipeline() removes all steps and restores the pristine dataset."""
+    sc = _load_scan()
+    original_unique = len(sc._raw_df['v0'].unique())
+    sc.set_pipeline([('filter_rows', (0, 100))])
+    assert len(sc.x) != original_unique
+    sc.clear_pipeline()
+    assert sc.pipeline == []
+    assert len(sc.x) == original_unique
+
+
+def test_backward_compat_wrappers_write_to_pipeline():
+    """Legacy wrapper methods correctly populate self.pipeline."""
+    sc = _load_scan()
+    sc.basic_filter(1.5)
+    assert sc.pipeline == [('basic_filter', {'m': 1.5})]
+
+
+def test_backward_compat_disable_removes_from_pipeline():
+    """Calling a wrapper with None removes the step from the pipeline."""
+    sc = _load_scan()
+    sc.basic_filter(1.5)
+    assert len(sc.pipeline) == 1
+    sc.basic_filter(None)
+    assert sc.pipeline == []
+
+
+def test_backward_compat_update_replaces_position():
+    """Updating a step via the wrapper preserves its position in the pipeline."""
+    sc = _load_scan()
+    sc.filter_rows((20, 280))
+    sc.basic_filter(1.5)
+    # filter_rows is at position 0, basic_filter at position 1
+    sc.filter_rows((10, 200))
+    assert len(sc.pipeline) == 2
+    assert sc.pipeline[0][0] == 'filter_rows'
+    assert sc.pipeline[0][1] == {'rows': (10, 200)}
+    assert sc.pipeline[1][0] == 'basic_filter'
+
+
+def test_set_pipeline_unknown_step_raises():
+    """set_pipeline with an unknown step name raises ValueError."""
+    sc = _load_scan()
+    try:
+        sc.set_pipeline([('nonexistent', {})])
+        assert False, "Expected ValueError"
+    except ValueError:
+        pass
+
+
+def test_pipeline_printable():
+    """sc.pipeline is a plain list of tuples — easy to inspect."""
+    sc = _load_scan()
+    sc.set_pipeline([
+        ('drop_rows', [50, 150]),
+        ('basic_filter', 1.5),
+    ])
+    s = str(sc.pipeline)
+    assert 'drop_rows' in s
+    assert 'basic_filter' in s
+

@@ -4,6 +4,8 @@ User-facing Scan and ScanMD classes.
 Backward-compatible API: sc.x, sc.y, sc.gauss.p0, sc.update_function(), etc.
 Internally delegates all computation to core.py and fitting.py.
 """
+from typing import Optional
+
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -21,6 +23,18 @@ from .core import (
     recompute_windows,
 )
 from .fitting import fit_gaussian, fit_double_gaussian, fit_rabi
+
+# ---------------------------------------------------------------------------
+# Pipeline step registry: maps step names to pure (df, **kwargs) -> df
+# ---------------------------------------------------------------------------
+_PIPELINE_STEPS = {
+    'drop_rows': lambda df, indices: df.drop(indices, axis=0),
+    'filter_rows': lambda df, rows: df.iloc[rows[0]:rows[1]].copy(),
+    'basic_filter': lambda df, m: apply_basic_filter(df, m),
+    'remove_unstable': lambda df, threshold, customfunction='a0-a1': (
+        apply_stability_filter(df, threshold, customfunction)
+    ),
+}
 
 
 class Scan:
@@ -68,6 +82,9 @@ class Scan:
         self.numloops = raw['metadata']['numloops']
         self.numtraces = raw['metadata']['numtraces']
 
+        # Declarative pipeline: ordered list of (step_name, kwargs)
+        self.pipeline: list[tuple[str, dict]] = []
+
         # Resolve experiment type
         if experiment is not None:
             if experiment not in ('microwave', 'volt', 'time'):
@@ -98,27 +115,32 @@ class Scan:
     # ------------------------------------------------------------------
 
     def _rebuild(self):
-        """Recompute everything from raw data. Single source of truth."""
-        # Start from a clean copy of raw data
-        self.df = self._raw_df.copy()
+        """Recompute from pristine raw data by replaying ``self.pipeline`` in order.
 
-        # Check for multi-dimensional scan
-        x2 = list(set(self.df['v1']))
-        if len(x2) > 1:
-            print('Multidimensional scan detected use scanmd')
+        ``evaluate_windows`` is called lazily — right before the first
+        step that requires the ``signal`` column.
+        """
+        df = self._raw_df.copy()
+        windows_evaluated = False
 
-        # Evaluate user function → adds 'signal' column
-        self.df = evaluate_windows(self.df, self.function)
+        for step_name, kwargs in self.pipeline:
+            if step_name in ('basic_filter', 'remove_unstable') and not windows_evaluated:
+                df = evaluate_windows(df, self.function)
+                windows_evaluated = True
 
-        # Calculate error if averages specified
-        self.df = calculate_signal_error(
-            self.df, self.numloops, self.averages
-        )
+            handler = _PIPELINE_STEPS[step_name]
+            df = handler(df, **kwargs)
 
-        # Group, average, baseline subtract
+        # Ensure windows are evaluated even if no signal-dependent steps were run
+        if not windows_evaluated:
+            df = evaluate_windows(df, self.function)
+
+        # Compute error, group, average, baseline subtract
+        df = calculate_signal_error(df, self.numloops, self.averages)
         result = process_signal(
-            self.df, self.experiment, self.numloops, self.averages
+            df, self.experiment, self.numloops, self.averages
         )
+        self.df = df
         self.x = result['x']
         self.y = result['y']
         self.xall = result['xall']
@@ -132,7 +154,7 @@ class Scan:
         self._x_original = self.x.copy()
         self._y_original = self.y.copy()
 
-        # Invalidate fit caches (lazy evaluation)
+        # Invalidate lazy fit caches
         self._gauss_cache = None
         self._gaussgauss_cache = None
         self._rabi_cache = None
@@ -213,51 +235,156 @@ class Scan:
         self.y = self._y_original.copy()[start:end]
 
     # ------------------------------------------------------------------
-    # Filtering
+    # Pipeline helpers
     # ------------------------------------------------------------------
 
-    def basic_filter(self, m: float):
-        """Remove outlier data points and recompute."""
-        self.df = apply_basic_filter(self.df, m)
-        # Re-run processing from filtered df (don't touch _raw_df)
-        self.df = calculate_signal_error(self.df, self.numloops, self.averages)
-        result = process_signal(
-            self.df, self.experiment, self.numloops, self.averages
-        )
-        self.x = result['x']
-        self.y = result['y']
-        self.xall = result['xall']
-        self.yall = result['yall']
-        self.error = result['error']
-        self.baseValue = result['baseValue']
-        self.variance = result['variance']
-        self.range = result['range']
-        self._x_original = self.x.copy()
-        self._y_original = self.y.copy()
-        self._gauss_cache = None
-        self._gaussgauss_cache = None
-        self._rabi_cache = None
+    _STEP_ARG_NAMES = {
+        'drop_rows': ['indices'],
+        'filter_rows': ['rows'],
+        'basic_filter': ['m'],
+        'remove_unstable': ['threshold', 'customfunction'],
+    }
 
-    def remove_unstable(self, m: float, customfunction: str = 'a0-a1'):
-        """Remove unstable data points and recompute."""
-        self.df = apply_stability_filter(self.df, m, customfunction)
-        self.df = calculate_signal_error(self.df, self.numloops, self.averages)
-        result = process_signal(
-            self.df, self.experiment, self.numloops, self.averages
+    def _resolve_step_args(self, name, args, kwargs) -> dict:
+        """Map positional convenience args onto the handler's kwarg names."""
+        resolved = dict(zip(self._STEP_ARG_NAMES[name], args))
+        resolved.update(kwargs)
+        return resolved
+
+    def _normalize_step(self, name, args):
+        """Used by ``set_pipeline`` to accept bare values or dicts uniformly."""
+        if isinstance(args, dict):
+            return (name, args)
+        if isinstance(args, tuple) and name in ('remove_unstable',):
+            return (name, self._resolve_step_args(name, args, {}))
+        return (name, self._resolve_step_args(name, (args,), {}))
+
+    def _replace_or_remove_step(self, name, value, arg_name, extra_kwargs=None):
+        """Remove any existing step of *name*, then re-add it unless *value* is None."""
+        # Remember the position of the existing step (if any)
+        existing_pos = None
+        for i, (n, kw) in enumerate(self.pipeline):
+            if n == name:
+                existing_pos = i
+                break
+        self.pipeline = [(n, kw) for n, kw in self.pipeline if n != name]
+        if value is not None:
+            kwargs = {arg_name: value, **(extra_kwargs or {})}
+            if existing_pos is not None:
+                self.pipeline.insert(existing_pos, (name, kwargs))
+            else:
+                self.pipeline.append((name, kwargs))
+        self._rebuild()
+
+    # ------------------------------------------------------------------
+    # Pipeline public API
+    # ------------------------------------------------------------------
+
+    def set_pipeline(self, steps: list):
+        """Replace the entire filter pipeline and rebuild.
+
+        Parameters
+        ----------
+        steps : list of (name, args)
+            Each entry is ``(step_name, kwargs_dict)`` or
+            ``(step_name, positional_value)`` — e.g.
+            ``('drop_rows', [50, 150])`` or
+            ``('drop_rows', {'indices': [50, 150]})``.
+        """
+        for name, args in steps:
+            if name not in _PIPELINE_STEPS:
+                raise ValueError(
+                    f"Unknown pipeline step '{name}'. "
+                    f"Valid: {list(_PIPELINE_STEPS)}"
+                )
+        self.pipeline = [self._normalize_step(name, args) for name, args in steps]
+        self._rebuild()
+
+    def add_step(self, name: str, *args, order: int = None, **kwargs):
+        """Append (or insert) a single pipeline step and rebuild.
+
+        Parameters
+        ----------
+        name : str
+            One of ``'drop_rows'``, ``'filter_rows'``, ``'basic_filter'``,
+            ``'remove_unstable'``.
+        order : int, optional
+            Position to insert at.  Defaults to the end.
+        """
+        if name not in _PIPELINE_STEPS:
+            raise ValueError(
+                f"Unknown pipeline step '{name}'. "
+                f"Valid: {list(_PIPELINE_STEPS)}"
+            )
+        step_kwargs = self._resolve_step_args(name, args, kwargs)
+        step = (name, step_kwargs)
+        if order is None:
+            self.pipeline.append(step)
+        else:
+            self.pipeline.insert(order, step)
+        self._rebuild()
+
+    def clear_pipeline(self):
+        """Remove all pipeline steps and restore the pristine, unfiltered dataset."""
+        self.pipeline = []
+        self._rebuild()
+
+    # ------------------------------------------------------------------
+    # Backward-compatible convenience wrappers
+    # ------------------------------------------------------------------
+
+    def filter_rows(self, rows: Optional[tuple]):
+        """Select a contiguous range of rows to keep.
+
+        Parameters
+        ----------
+        rows : tuple of (start, end) or None
+            ``(start, end)`` passed to ``DataFrame.iloc[start:end]``.
+            ``None`` disables the row range and restores the full dataset.
+        """
+        self._replace_or_remove_step('filter_rows', rows, arg_name='rows')
+
+    def filter_drop_rows(self, indices):
+        """Drop specific rows by their DataFrame index.
+
+        Parameters
+        ----------
+        indices : list, tuple, or None
+            Row indices to exclude from the dataset.
+            ``None`` disables the drop and restores those rows.
+        """
+        self._replace_or_remove_step(
+            'drop_rows',
+            list(indices) if indices is not None else None,
+            arg_name='indices',
         )
-        self.x = result['x']
-        self.y = result['y']
-        self.xall = result['xall']
-        self.yall = result['yall']
-        self.error = result['error']
-        self.baseValue = result['baseValue']
-        self.variance = result['variance']
-        self.range = result['range']
-        self._x_original = self.x.copy()
-        self._y_original = self.y.copy()
-        self._gauss_cache = None
-        self._gaussgauss_cache = None
-        self._rabi_cache = None
+
+    def basic_filter(self, m: Optional[float]):
+        """Apply (or disable) the basic outlier filter.
+
+        Parameters
+        ----------
+        m : float or None
+            Relative spacing threshold.  ``None`` disables the filter
+            and restores previously removed points.
+        """
+        self._replace_or_remove_step('basic_filter', m, arg_name='m')
+
+    def remove_unstable(self, threshold: Optional[float], customfunction: str = 'a0-a1'):
+        """Apply (or disable) the stability filter.
+
+        Parameters
+        ----------
+        threshold : float or None
+            Maximum allowed value of *customfunction*.  ``None`` disables
+            the filter and restores previously removed points.
+        customfunction : str
+            Expression evaluated on the raw window columns.
+        """
+        self._replace_or_remove_step(
+            'remove_unstable', threshold, arg_name='threshold',
+            extra_kwargs={'customfunction': customfunction},
+        )
 
     # ------------------------------------------------------------------
     # Stability
@@ -326,9 +453,10 @@ class Scan:
     # ------------------------------------------------------------------
 
     def load_database(self):
-        """Reload raw data from HDF5 and rebuild."""
+        """Reload raw data from HDF5, reset all filters, and rebuild."""
         raw = load_raw_hdf5(self.filename)
         self._raw_df = raw['df']
+        self.pipeline = []
         self._rebuild()
 
     def filter(self, m: float):
@@ -449,15 +577,48 @@ class _ScanSubset:
         numloops: int = 1,
     ):
         self.experiment = experiment
-        self.df = df
         self.x2 = x2
         self.function = function
         self.filename = filename
         self.averages = averages
         self.numloops = numloops
 
-        # Process the subset
-        result = process_signal(df, experiment, numloops, averages)
+        # Pristine raw data for this subset (already has 'signal' column)
+        self._raw_df = df.copy()
+
+        # Declarative pipeline: ordered list of (step_name, kwargs)
+        self.pipeline: list[tuple[str, dict]] = []
+
+        # Lazy fit caches
+        self._gauss_cache = None
+        self._gaussgauss_cache = None
+        self._rabi_cache = None
+
+        # Run the full processing pipeline
+        self._rebuild()
+
+    def _rebuild(self):
+        """Recompute from pristine subset data by replaying ``self.pipeline``."""
+        df = self._raw_df.copy()
+        windows_evaluated = False
+
+        for step_name, kwargs in self.pipeline:
+            if step_name in ('basic_filter', 'remove_unstable') and not windows_evaluated:
+                df = evaluate_windows(df, self.function)
+                windows_evaluated = True
+
+            handler = _PIPELINE_STEPS[step_name]
+            df = handler(df, **kwargs)
+
+        if not windows_evaluated:
+            df = evaluate_windows(df, self.function)
+
+        # Compute error, group, average, baseline subtract
+        df = calculate_signal_error(df, self.numloops, self.averages)
+        result = process_signal(
+            df, self.experiment, self.numloops, self.averages
+        )
+        self.df = df
         self.x = result['x']
         self.y = result['y']
         self.xall = result['xall']
@@ -467,10 +628,14 @@ class _ScanSubset:
         self.variance = result['variance']
         self.range = result['range']
 
-        # Lazy fit caches
+        # Invalidate lazy fit caches
         self._gauss_cache = None
         self._gaussgauss_cache = None
         self._rabi_cache = None
+
+    # ------------------------------------------------------------------
+    # Lazy-cached fit properties
+    # ------------------------------------------------------------------
 
     @property
     def gauss(self):
@@ -507,20 +672,103 @@ class _ScanSubset:
             plt.hlines(hline, 0, stability.shape[0])
         plt.ylabel(customfunction)
 
-    def remove_unstable(self, m: float, customfunction: str = 'a0-a1'):
-        """Remove unstable points and reprocess the subset."""
-        self.df = apply_stability_filter(self.df, m, customfunction)
-        result = process_signal(
-            self.df, self.experiment, self.numloops, self.averages
+    # ------------------------------------------------------------------
+    # Pipeline helpers (subset-specific)
+    # ------------------------------------------------------------------
+
+    _STEP_ARG_NAMES = {
+        'drop_rows': ['indices'],
+        'filter_rows': ['rows'],
+        'basic_filter': ['m'],
+        'remove_unstable': ['threshold', 'customfunction'],
+    }
+
+    def _resolve_step_args(self, name, args, kwargs) -> dict:
+        resolved = dict(zip(self._STEP_ARG_NAMES[name], args))
+        resolved.update(kwargs)
+        return resolved
+
+    def _normalize_step(self, name, args):
+        if isinstance(args, dict):
+            return (name, args)
+        if isinstance(args, tuple) and name in ('remove_unstable',):
+            return (name, self._resolve_step_args(name, args, {}))
+        return (name, self._resolve_step_args(name, (args,), {}))
+
+    def _replace_or_remove_step(self, name, value, arg_name, extra_kwargs=None):
+        """Remove any existing step of *name*, then re-add it unless *value* is None."""
+        existing_pos = None
+        for i, (n, kw) in enumerate(self.pipeline):
+            if n == name:
+                existing_pos = i
+                break
+        self.pipeline = [(n, kw) for n, kw in self.pipeline if n != name]
+        if value is not None:
+            kwargs = {arg_name: value, **(extra_kwargs or {})}
+            if existing_pos is not None:
+                self.pipeline.insert(existing_pos, (name, kwargs))
+            else:
+                self.pipeline.append((name, kwargs))
+        self._rebuild()
+
+    # ------------------------------------------------------------------
+    # Pipeline public API
+    # ------------------------------------------------------------------
+
+    def set_pipeline(self, steps: list):
+        """Replace the entire filter pipeline and rebuild."""
+        for name, args in steps:
+            if name not in _PIPELINE_STEPS:
+                raise ValueError(
+                    f"Unknown pipeline step '{name}'. "
+                    f"Valid: {list(_PIPELINE_STEPS)}"
+                )
+        self.pipeline = [self._normalize_step(name, args) for name, args in steps]
+        self._rebuild()
+
+    def add_step(self, name: str, *args, order: int = None, **kwargs):
+        """Append (or insert) a single pipeline step and rebuild."""
+        if name not in _PIPELINE_STEPS:
+            raise ValueError(
+                f"Unknown pipeline step '{name}'. "
+                f"Valid: {list(_PIPELINE_STEPS)}"
+            )
+        step_kwargs = self._resolve_step_args(name, args, kwargs)
+        step = (name, step_kwargs)
+        if order is None:
+            self.pipeline.append(step)
+        else:
+            self.pipeline.insert(order, step)
+        self._rebuild()
+
+    def clear_pipeline(self):
+        """Remove all pipeline steps and restore the pristine, unfiltered dataset."""
+        self.pipeline = []
+        self._rebuild()
+
+    # ------------------------------------------------------------------
+    # Backward-compatible convenience wrappers
+    # ------------------------------------------------------------------
+
+    def filter_rows(self, rows: Optional[tuple]):
+        """Select a contiguous range of rows to keep."""
+        self._replace_or_remove_step('filter_rows', rows, arg_name='rows')
+
+    def filter_drop_rows(self, indices):
+        """Drop specific rows by their DataFrame index."""
+        self._replace_or_remove_step(
+            'drop_rows',
+            list(indices) if indices is not None else None,
+            arg_name='indices',
         )
-        self.x = result['x']
-        self.y = result['y']
-        self.xall = result['xall']
-        self.yall = result['yall']
-        self.error = result['error']
-        self.baseValue = result['baseValue']
-        self.variance = result['variance']
-        self.range = result['range']
-        self._gauss_cache = None
-        self._gaussgauss_cache = None
-        self._rabi_cache = None
+
+    def basic_filter(self, m: Optional[float]):
+        """Apply (or disable) the basic outlier filter."""
+        self._replace_or_remove_step('basic_filter', m, arg_name='m')
+
+    def remove_unstable(self, threshold: Optional[float], customfunction: str = 'a0-a1'):
+        """Apply (or disable) the stability filter."""
+        self._replace_or_remove_step(
+            'remove_unstable', threshold, arg_name='threshold',
+            extra_kwargs={'customfunction': customfunction},
+        )

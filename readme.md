@@ -162,6 +162,93 @@ The position of the windows can be changed by defining a new set of indices for 
 >>> sc.plot_trace(0) # Check new windows
 ```
 
+## Filtering
+
+The Scan object provides a non-destructive, reversible filtering system. All filters operate on a pristine copy of the raw data — nothing is permanently removed until you explicitly reset the pipeline. You can enable, disable, tweak, or reorder filters at any time without losing data.
+
+Filters are configured as an ordered list of steps stored in `sc.pipeline`. Each step is applied in sequence during every rebuild of the processed data. The available filter steps are:
+
+| Step name | What it does |
+|-----------|-------------|
+| `drop_rows` | Excludes specific rows by their DataFrame index |
+| `filter_rows` | Keeps only a contiguous range of rows (start, end) |
+| `basic_filter` | Removes outlier data points using a relative spacing threshold |
+| `remove_unstable` | Removes measurements where a stability metric exceeds a threshold |
+
+### Setting a pipeline
+
+Use `set_pipeline` to declare the full filter sequence in one call. The order you specify is the order in which filters are applied:
+
+```
+>>> sc.set_pipeline([
+...     ('drop_rows', [50, 150]),
+...     ('filter_rows', (20, 280)),
+...     ('basic_filter', 1.5),
+...     ('remove_unstable', 0.01),
+... ])
+```
+
+You can inspect the current pipeline at any time:
+```
+>>> sc.pipeline
+[('drop_rows', {'indices': [50, 150]}),
+ ('filter_rows', {'rows': (20, 280)}),
+ ('basic_filter', {'m': 1.5}),
+ ('remove_unstable', {'threshold': 0.01, 'customfunction': 'a0-a1'})]
+```
+
+### Adding and inserting steps
+
+Use `add_step` to build a pipeline incrementally. By default, steps are appended to the end:
+
+```
+>>> sc.clear_pipeline()
+>>> sc.add_step('basic_filter', 1.5)
+>>> sc.add_step('filter_rows', (20, 280))
+```
+
+Pass `order=` to insert a step at a specific position:
+```
+>>> sc.add_step('drop_rows', [50, 150], order=0)  # insert before everything else
+```
+
+### Disabling and re-enabling filters
+
+Calling any of filter methodst with `None` removes that filter from the pipeline:
+
+```
+>>> sc.basic_filter(1.5)
+>>> sc.basic_filter(None)   # disables the filter, data is fully restored
+```
+
+### Resetting the pipeline
+
+Remove all filters and restore the pristine, unfiltered dataset:
+```
+>>> sc.clear_pipeline()
+```
+
+### Comparing filter orders
+
+Because the pipeline order is user-controlled, you can easily compare the effect of applying filters in different sequences:
+
+```
+>>> sc.set_pipeline([('drop_rows', [50, 150]), ('filter_rows', (20, 280))])
+>>> result_a = sc.y.copy()
+
+>>> sc.set_pipeline([('filter_rows', (20, 280)), ('drop_rows', [50, 150])])
+>>> result_b = sc.y.copy()
+```
+
+### Filter details
+
+**`drop_rows`** — Takes a list of integer indices. Rows matching those indices are removed from the raw DataFrame before any other processing. Useful for dropping known-bad measurement points.
+
+**`filter_rows`** — Takes a `(start, end)` tuple. Behaves like `DataFrame.iloc[start:end]` — keeps rows from index `start` up to (but not including) `end`. Pass `None` for either value to leave that end unbounded, e.g. `(10, None)` drops the first 10 rows but keeps everything after.
+
+**`basic_filter`** — Takes a float `m`. For each measurement group, if the gap between the first two sorted signal values exceeds `m` times the gap between the second and third, the extreme point is dropped. A typical value is `1.5`.
+
+**`remove_unstable`** — Takes a float `threshold` and an optional `customfunction` string (default `'a0-a1'`). Any measurement where the evaluated function exceeds the threshold is removed. Useful for filtering out drift or instability in the experiment.
 
 
 
