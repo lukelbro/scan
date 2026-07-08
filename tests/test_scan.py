@@ -439,3 +439,67 @@ def test_trace_unknown_channel_raises():
     with raises(ValueError, match="not found"):
         sc.trace(0, channel='osc_2')
 
+
+# ---------------------------------------------------------------------------
+# param_names on FitResult
+# ---------------------------------------------------------------------------
+
+def test_gauss_param_names():
+    """gauss.param_names matches expected (A, mu, sigma)."""
+    sc = _load_scan()
+    assert sc.gauss.param_names == ('A', 'mu', 'sigma')
+
+
+def test_gaussgauss_param_names():
+    """gaussgauss.param_names uses primary/secondary naming."""
+    sc = e11scan.scan(
+        filename='tests/20221208_006_scan.h5',
+        function='a0-a1', experiment='microwave',
+    )
+    assert sc.gaussgauss.param_names == (
+        'A_primary', 'mu_primary', 'sigma_primary',
+        'A_secondary', 'mu_secondary', 'sigma_secondary',
+    )
+
+
+def test_rabi_param_names():
+    """rabi.param_names matches expected (omega, decay, amplitude)."""
+    sc = e11scan.scan(
+        filename='tests/20210722_038_scan.h5',
+        function='-(a0 - a1)/((a0 - a1) + (a0 - a2))',
+        experiment='time',
+    )
+    assert sc.rabi.param_names == ('omega', 'decay', 'amplitude')
+
+
+def test_param_names_length_matches_p0():
+    """len(param_names) == len(p0) for all fit types."""
+    sc = _load_scan()
+    assert len(sc.gauss.param_names) == len(sc.gauss.p0)
+
+    sc2 = e11scan.scan(
+        filename='tests/20221208_006_scan.h5',
+        function='a0-a1', experiment='microwave',
+    )
+    assert len(sc2.gaussgauss.param_names) == len(sc2.gaussgauss.p0)
+
+    sc3 = e11scan.scan(
+        filename='tests/20210722_038_scan.h5',
+        function='-(a0 - a1)/((a0 - a1) + (a0 - a2))',
+        experiment='time',
+    )
+    assert len(sc3.rabi.param_names) == len(sc3.rabi.p0)
+
+
+def test_gaussgauss_primary_is_taller_peak():
+    """The primary peak amplitude should be >= the secondary peak amplitude."""
+    sc = e11scan.scan(
+        filename='tests/20221208_006_scan.h5',
+        function='a0-a1', experiment='microwave',
+    )
+    names = sc.gaussgauss.param_names
+    p = sc.gaussgauss.p0
+    A_primary = p[names.index('A_primary')]
+    A_secondary = p[names.index('A_secondary')]
+    assert A_primary >= A_secondary
+

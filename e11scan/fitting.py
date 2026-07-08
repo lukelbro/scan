@@ -52,12 +52,15 @@ class FitResult:
     var_matrix : covariance matrix (numpy array)
     func : the model callable  f(x, *params) -> y
     x_source : the x array that was fitted against
+    param_names : tuple of parameter names matching p0 indices
+        (e.g. ``('A', 'mu', 'sigma')``).  Empty tuple if not set.
     error_source : the error/sigma array used (or None)
     """
     p0: np.ndarray
     var_matrix: np.ndarray
     func: Callable
     x_source: np.ndarray
+    param_names: tuple[str, ...] = ()
     error_source: Optional[np.ndarray] = None
 
     # --- Lazy-cached evaluation (computed once, then stored) ---------------
@@ -147,6 +150,7 @@ def fit_gaussian(
         var_matrix=np.array(var),
         func=gaussian_func,
         x_source=np.asarray(x),
+        param_names=('A', 'mu', 'sigma'),
         error_source=np.asarray(error) if error is not None else None,
     )
 
@@ -158,8 +162,12 @@ def fit_double_gaussian(
 ) -> FitResult:
     """Fit a sum of two Gaussians to (x, y) data.
 
-    Uses scipy peak finding to seed the two peaks.
-    Returns a FitResult with .p0 = [A1, mu1, sigma1, A2, mu2, sigma2].
+    Uses scipy peak finding to seed the two peaks.  The primary peak is
+    the most prominent (tallest); the secondary peak is the less prominent.
+    This is NOT necessarily left-to-right ordering.
+
+    Returns a FitResult with .p0 = [A_primary, mu_primary, sigma_primary,
+    A_secondary, mu_secondary, sigma_secondary].
     """
     x = np.asarray(x, dtype=float)
     y = np.asarray(y, dtype=float)
@@ -198,6 +206,8 @@ def fit_double_gaussian(
         var_matrix=np.array(var),
         func=double_gaussian_func,
         x_source=np.asarray(x),
+        param_names=('A_primary', 'mu_primary', 'sigma_primary',
+                     'A_secondary', 'mu_secondary', 'sigma_secondary'),
         error_source=np.asarray(error) if error is not None else None,
     )
 
@@ -246,5 +256,6 @@ def fit_rabi(
         var_matrix=np.array(var),
         func=rabi_func,
         x_source=np.asarray(x),
+        param_names=('omega', 'decay', 'amplitude'),
         error_source=np.asarray(error) if error is not None else None,
     )

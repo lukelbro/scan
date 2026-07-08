@@ -110,6 +110,29 @@ It is also possible to return the values predicted by the model.
 ```
 ![gauss_fit_example.png](gauss_fit_example.png)
 
+### Gaussgauss
+
+A double Gaussian fit for two-peak spectra.
+
+$$
+A_\mathrm{p} \, e^{- \frac{(x-\mu_\mathrm{p})^2}{2 \sigma_\mathrm{p}^2}}
+\;+\;
+A_\mathrm{s} \, e^{- \frac{(x-\mu_\mathrm{s})^2}{2 \sigma_\mathrm{s}^2}}
+$$
+
+The **primary** peak is the most prominent (tallest) peak; the **secondary** peak is the less prominent peak. This is *not* necessarily left-to-right ordering — prominence is determined by scipy's peak finding, not by x-position.
+
+`p0()` is returned in the order: `[A_primary, mu_primary, sigma_primary, A_secondary, mu_secondary, sigma_secondary]`
+
+```
+>>> sc.gaussgauss.param_names
+('A_primary', 'mu_primary', 'sigma_primary', 'A_secondary', 'mu_secondary', 'sigma_secondary')
+
+>>> dict(zip(sc.gaussgauss.param_names, sc.gaussgauss.p0))
+{'A_primary': 0.8, 'mu_primary': 19.56, 'sigma_primary': 6.6e-05,
+ 'A_secondary': 0.3, 'mu_secondary': 19.52, 'sigma_secondary': 5.1e-05}
+```
+
 ### Rabi
 
 $$
