@@ -77,6 +77,15 @@ def load_raw_hdf5(filename: str) -> dict:
         'experiment_type': experiment_type,
     }
 
+    # Guard: if both channels exist they must have the same number of traces
+    has_osc_1 = 'osc_1' in f
+    if has_osc_1 and len(f['osc_1']) != len(f['osc_0']):
+        raise ValueError(
+            f"osc_0 has {len(f['osc_0'])} traces but osc_1 has "
+            f"{len(f['osc_1'])}. Both channels must have the same "
+            f"number of rows."
+        )
+
     return {
         'df': df,
         'f': f,
@@ -87,21 +96,37 @@ def load_raw_hdf5(filename: str) -> dict:
         'windows': windows,
         'windowsind': windowsind,
         'metadata': metadata,
+        'has_osc_1': has_osc_1,
     }
 
 
-def load_trace(f, ind: int):
+def load_trace(f, ind: int, channel: str = 'osc_0'):
     """Load a single oscilloscope trace from an open HDF5 file.
 
-    Returns (tt, signal) where tt is the time axis and signal is the trace.
+    Parameters
+    ----------
+    f : h5py.File
+        Open HDF5 file handle.
+    ind : int
+        Trace index.
+    channel : str
+        HDF5 dataset name.  Default ``'osc_0'``.  Pass ``'osc_1'`` to read
+        the secondary channel.
+
+    Returns
+    -------
+    (tt, signal) where tt is the time axis and signal is the trace.
     """
-    if ind > len(f['osc_0']):
+    if channel not in f:
+        raise ValueError(f"Channel '{channel}' not found in HDF5 file.")
+    if ind > len(f[channel]):
         raise ValueError(
-            f"Number of scans is {len(f['osc_0'])}, {ind} is outside range"
+            f"Number of scans in '{channel}' is {len(f[channel])}, "
+            f"{ind} is outside range"
         )
-    signal = f['osc_0'][ind]
-    t0 = f['osc_0'].attrs['t0']
-    dt = f['osc_0'].attrs['dt']
+    signal = f[channel][ind]
+    t0 = f[channel].attrs['t0']
+    dt = f[channel].attrs['dt']
     tt = np.linspace(t0, t0 + dt * len(signal), len(signal))
     return tt, signal
 

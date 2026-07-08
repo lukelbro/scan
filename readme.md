@@ -250,6 +250,33 @@ Because the pipeline order is user-controlled, you can easily compare the effect
 
 **`remove_unstable`** — Takes a float `threshold` and an optional `customfunction` string (default `'a0-a1'`). Any measurement where the evaluated function exceeds the threshold is removed. Useful for filtering out drift or instability in the experiment.
 
+### Working with osc_1 traces
+
+Some HDF5 files contain a second oscilloscope channel (`osc_1`). You can check for it with `sc.has_osc_1` and access its traces by passing `channel='osc_1'` to `trace()`:
+
+```
+>>> sc = e11scan.scan('data_with_two_channels.h5', function='a0 - a1')
+>>> sc.has_osc_1
+True
+
+>>> tt, signal = sc.trace(0, channel='osc_1')
+>>> plt.plot(tt, signal)
+```
+
+`osc_1` traces are read-only and not included in the signal analysis pipeline — they are there for you to inspect and process manually. When you identify bad traces from `osc_1`, drop them using `filter_drop_rows` with the same indices (the two channels share the same trace ordering):
+
+```
+>>> # Inspect osc_1 traces and find bad ones
+>>> bad = []
+>>> for i in range(sc.numtraces):
+...     _, sig = sc.trace(i, channel='osc_1')
+...     if np.max(sig) < 0.05:
+...         bad.append(i)
+
+>>> # Drop them — this also removes the corresponding osc_0 rows
+>>> sc.filter_drop_rows(bad)
+```
+
 
 
 ## Error Calculation

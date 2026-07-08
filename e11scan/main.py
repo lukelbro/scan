@@ -81,6 +81,7 @@ class Scan:
         self.timestamp = raw['metadata']['timestamp']
         self.numloops = raw['metadata']['numloops']
         self.numtraces = raw['metadata']['numtraces']
+        self.has_osc_1: bool = raw['has_osc_1']
 
         # Declarative pipeline: ordered list of (step_name, kwargs)
         self.pipeline: list[tuple[str, dict]] = []
@@ -411,9 +412,20 @@ class Scan:
     # Trace access
     # ------------------------------------------------------------------
 
-    def trace(self, ind: int):
-        """Get raw oscilloscope trace (time array, signal array)."""
-        return load_trace(self.f, ind)
+    def trace(self, ind: int, channel: str = 'osc_0'):
+        """Get raw oscilloscope trace (time array, signal array).
+
+        Parameters
+        ----------
+        ind : int
+            Trace index.
+        channel : str
+            ``'osc_0'`` (default) or ``'osc_1'``.  Raises ``ValueError``
+            if ``'osc_1'`` is requested but not present in the file.
+        """
+        if channel == 'osc_1' and not self.has_osc_1:
+            raise ValueError("No osc_1 channel in this HDF5 file.")
+        return load_trace(self.f, ind, channel=channel)
 
     def plot_trace(self, ind: int):
         """Plot an oscilloscope trace with window markers."""
@@ -499,6 +511,7 @@ class ScanMD(Scan):
         self.timestamp = raw['metadata']['timestamp']
         self.numloops = raw['metadata']['numloops']
         self.numtraces = raw['metadata']['numtraces']
+        self.has_osc_1: bool = raw['has_osc_1']
 
         # Resolve experiment type
         if experiment is not None:

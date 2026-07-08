@@ -390,3 +390,52 @@ def test_pipeline_printable():
     assert 'drop_rows' in s
     assert 'basic_filter' in s
 
+
+# ---------------------------------------------------------------------------
+# osc_1 minimal support
+# ---------------------------------------------------------------------------
+
+_OSC1_FILENAME = 'tests/20260529_019_scan.h5'
+
+
+def test_has_osc_1_true():
+    """File with osc_1 channel sets has_osc_1 to True."""
+    sc = e11scan.scan(filename=_OSC1_FILENAME, function='a0-a1', experiment='microwave')
+    assert sc.has_osc_1 is True
+
+
+def test_has_osc_1_false():
+    """File without osc_1 channel sets has_osc_1 to False."""
+    sc = _load_scan()
+    assert sc.has_osc_1 is False
+
+
+def test_trace_osc_0_default():
+    """trace(ind) with no channel arg returns osc_0 data (backward compat)."""
+    sc = e11scan.scan(filename=_OSC1_FILENAME, function='a0-a1', experiment='microwave')
+    tt, signal = sc.trace(0)
+    assert len(tt) == len(signal)
+    assert len(signal) == 1002  # known trace length for this file
+
+
+def test_trace_osc_1():
+    """trace(ind, channel='osc_1') returns osc_1 data with correct shape."""
+    sc = e11scan.scan(filename=_OSC1_FILENAME, function='a0-a1', experiment='microwave')
+    tt, signal = sc.trace(0, channel='osc_1')
+    assert len(tt) == len(signal)
+    assert len(signal) == 1002
+
+
+def test_trace_osc_1_raises_if_missing():
+    """Requesting osc_1 on a file without it raises ValueError."""
+    sc = _load_scan()
+    with raises(ValueError, match="No osc_1 channel"):
+        sc.trace(0, channel='osc_1')
+
+
+def test_trace_unknown_channel_raises():
+    """Requesting a nonexistent channel raises ValueError."""
+    sc = e11scan.scan(filename=_OSC1_FILENAME, function='a0-a1', experiment='microwave')
+    with raises(ValueError, match="not found"):
+        sc.trace(0, channel='osc_2')
+
