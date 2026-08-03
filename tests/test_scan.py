@@ -505,53 +505,53 @@ def test_gaussgauss_primary_is_taller_peak():
 
 
 # ------------------------------------------------------------------
-# Fit p0 setter tests
+# Fit p0 property tests
 # ------------------------------------------------------------------
 
-def test_set_gauss_p0_on_scan():
-    """set_gauss_p0 provides a seed that affects the fit result."""
+def test_gauss_p0_on_scan():
+    """gauss_p0 property provides a seed that affects the fit result."""
     sc = _load_scan()
     # Get default fit
     default_p0 = sc.gauss.p0.copy()
 
     # Set a custom seed and verify the fit changes
-    sc.set_gauss_p0([default_p0[0] * 0.5, default_p0[1], default_p0[2] * 2.0])
+    sc.gauss_p0 = [default_p0[0] * 0.5, default_p0[1], default_p0[2] * 2.0]
     custom_result = sc.gauss
     # The fit should still converge (may or may not equal default)
     assert len(custom_result.p0) == 3
     assert custom_result.p0[0] > 0  # A should be positive
 
 
-def test_set_gauss_p0_none_reverts_to_heuristic():
+def test_gauss_p0_none_reverts_to_heuristic():
     """Setting p0=None reverts to automatic heuristic."""
     sc = _load_scan()
     default_p0 = sc.gauss.p0.copy()
 
     # Set a custom seed
-    sc.set_gauss_p0([0.1, 19.5, 0.001])
+    sc.gauss_p0 = [0.1, 19.5, 0.001]
     sc.gauss  # force computation with custom seed
 
     # Revert to heuristic
-    sc.set_gauss_p0(None)
+    sc.gauss_p0 = None
     reverted = sc.gauss
     # Should get back to the same result as default
     assert np.allclose(reverted.p0, default_p0, atol=1e-6)
 
 
-def test_set_gauss_p0_cache_invalidation():
+def test_gauss_p0_cache_invalidation():
     """Setting p0 invalidates the cache."""
     sc = _load_scan()
     sc.gauss  # populate cache
     assert sc._gauss_cache is not None
 
-    sc.set_gauss_p0([0.1, 19.5, 0.001])
+    sc.gauss_p0 = [0.1, 19.5, 0.001]
     assert sc._gauss_cache is None  # cache invalidated
 
 
-def test_set_gauss_p0_survives_pipeline_change():
+def test_gauss_p0_survives_pipeline_change():
     """p0 persists across pipeline/filter changes (unlike fit caches)."""
     sc = _load_scan()
-    sc.set_gauss_p0([0.1, 19.5, 0.001])
+    sc.gauss_p0 = [0.1, 19.5, 0.001]
     assert sc._gauss_p0 == [0.1, 19.5, 0.001]
 
     # Apply a filter — p0 should survive
@@ -559,10 +559,10 @@ def test_set_gauss_p0_survives_pipeline_change():
     assert sc._gauss_p0 == [0.1, 19.5, 0.001]
 
 
-def test_set_gauss_p0_clears_on_load_database():
+def test_gauss_p0_clears_on_load_database():
     """load_database() resets p0 to None."""
     sc = _load_scan()
-    sc.set_gauss_p0([0.1, 19.5, 0.001])
+    sc.gauss_p0 = [0.1, 19.5, 0.001]
     assert sc._gauss_p0 is not None
 
     sc.load_database()
@@ -571,22 +571,22 @@ def test_set_gauss_p0_clears_on_load_database():
     assert sc._rabi_p0 is None
 
 
-def test_set_gaussgauss_p0_on_scan():
-    """set_gaussgauss_p0 provides a seed for double Gaussian."""
+def test_gaussgauss_p0_on_scan():
+    """gaussgauss_p0 property provides a seed for double Gaussian."""
     sc = _load_scan()
     result = sc.gaussgauss
     assert len(result.p0) == 6
 
 
-def test_set_rabi_p0_on_scan():
-    """set_rabi_p0 provides a seed for Rabi fit."""
+def test_rabi_p0_on_scan():
+    """rabi_p0 property provides a seed for Rabi fit."""
     sc = _load_scan()
     result = sc.rabi
     assert len(result.p0) == 3
 
 
-def test_set_gauss_p0_on_scan_subset():
-    """set_gauss_p0 works on _ScanSubset (via ScanMD)."""
+def test_gauss_p0_on_scan_subset():
+    """gauss_p0 property works on _ScanSubset (via ScanMD)."""
     scs = e11scan.scanmd(
         filename='tests/20221208_006_scan.h5',
         function='a0-a1', experiment='microwave',
@@ -595,12 +595,12 @@ def test_set_gauss_p0_on_scan_subset():
     default_p0 = subset.gauss.p0.copy()
 
     # Set a custom seed
-    subset.set_gauss_p0([default_p0[0] * 0.5, default_p0[1], default_p0[2] * 2.0])
+    subset.gauss_p0 = [default_p0[0] * 0.5, default_p0[1], default_p0[2] * 2.0]
     result = subset.gauss
     assert len(result.p0) == 3
 
 
-def test_set_gauss_p0_none_on_subset():
+def test_gauss_p0_none_on_subset():
     """Setting p0=None on a subset reverts to heuristic."""
     scs = e11scan.scanmd(
         filename='tests/20221208_006_scan.h5',
@@ -609,10 +609,48 @@ def test_set_gauss_p0_none_on_subset():
     subset = scs.sets[0]
     default_p0 = subset.gauss.p0.copy()
 
-    subset.set_gauss_p0([0.1, 19.5, 0.001])
+    subset.gauss_p0 = [0.1, 19.5, 0.001]
     subset.gauss  # force computation
 
-    subset.set_gauss_p0(None)
+    subset.gauss_p0 = None
     reverted = subset.gauss
     assert np.allclose(reverted.p0, default_p0, atol=1e-6)
+
+
+def test_gauss_p0_property_readable():
+    """gauss_p0 is readable: None by default, value after setting."""
+    sc = _load_scan()
+    assert sc.gauss_p0 is None
+
+    sc.gauss_p0 = [0.1, 19.5, 0.001]
+    assert sc.gauss_p0 == [0.1, 19.5, 0.001]
+
+    sc.gauss_p0 = None
+    assert sc.gauss_p0 is None
+
+
+def test_gaussgauss_p0_property_settable():
+    """gaussgauss_p0 property can be set and read."""
+    sc = _load_scan()
+    assert sc.gaussgauss_p0 is None
+
+    sc.gaussgauss_p0 = [1.0, -2.0, 0.5, 0.7, 2.0, 0.5]
+    assert sc.gaussgauss_p0 == [1.0, -2.0, 0.5, 0.7, 2.0, 0.5]
+    assert sc._gaussgauss_cache is None  # cache invalidated
+
+    sc.gaussgauss_p0 = None
+    assert sc.gaussgauss_p0 is None
+
+
+def test_rabi_p0_property_settable():
+    """rabi_p0 property can be set and read."""
+    sc = _load_scan()
+    assert sc.rabi_p0 is None
+
+    sc.rabi_p0 = [3.0, 4.0, 0.8]
+    assert sc.rabi_p0 == [3.0, 4.0, 0.8]
+    assert sc._rabi_cache is None  # cache invalidated
+
+    sc.rabi_p0 = None
+    assert sc.rabi_p0 is None
 

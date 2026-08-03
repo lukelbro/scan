@@ -179,6 +179,20 @@ class Scan:
         return self._gauss_cache
 
     @property
+    def gauss_p0(self):
+        """Initial parameter guess for Gaussian fit: ``[A, mu, sigma]``.
+
+        Set to ``None`` to revert to the automatic heuristic.
+        Setting this value invalidates the cached fit.
+        """
+        return self._gauss_p0
+
+    @gauss_p0.setter
+    def gauss_p0(self, value):
+        self._gauss_p0 = list(value) if value is not None else None
+        self._gauss_cache = None
+
+    @property
     def gaussgauss(self):
         """Double Gaussian fit result (computed on first access, then cached)."""
         if self._gaussgauss_cache is None:
@@ -186,6 +200,21 @@ class Scan:
                 self.x, self.y, self.error, p0=self._gaussgauss_p0
             )
         return self._gaussgauss_cache
+
+    @property
+    def gaussgauss_p0(self):
+        """Initial parameter guess for double Gaussian fit:
+        ``[A1, mu1, sigma1, A2, mu2, sigma2]``.
+
+        Set to ``None`` to revert to the automatic heuristic.
+        Setting this value invalidates the cached fit.
+        """
+        return self._gaussgauss_p0
+
+    @gaussgauss_p0.setter
+    def gaussgauss_p0(self, value):
+        self._gaussgauss_p0 = list(value) if value is not None else None
+        self._gaussgauss_cache = None
 
     @property
     def rabi(self):
@@ -196,37 +225,18 @@ class Scan:
             )
         return self._rabi_cache
 
-    # ------------------------------------------------------------------
-    # Fit p0 setter methods
-    # ------------------------------------------------------------------
+    @property
+    def rabi_p0(self):
+        """Initial parameter guess for Rabi fit: ``[omega, decay, amplitude]``.
 
-    def set_gauss_p0(self, p0: list):
-        """Set initial parameter guess for Gaussian fit: ``[A, mu, sigma]``.
-
-        Pass ``None`` to revert to the automatic heuristic.
-        Invalidates the cached fit so the next ``.gauss`` access recomputes.
+        All values must be non-negative.  Set to ``None`` to revert to the
+        automatic heuristic.  Setting this value invalidates the cached fit.
         """
-        self._gauss_p0 = list(p0) if p0 is not None else None
-        self._gauss_cache = None
+        return self._rabi_p0
 
-    def set_gaussgauss_p0(self, p0: list):
-        """Set initial parameter guess for double Gaussian fit:
-        ``[A1, mu1, sigma1, A2, mu2, sigma2]``.
-
-        Pass ``None`` to revert to the automatic heuristic.
-        Invalidates the cached fit so the next ``.gaussgauss`` access recomputes.
-        """
-        self._gaussgauss_p0 = list(p0) if p0 is not None else None
-        self._gaussgauss_cache = None
-
-    def set_rabi_p0(self, p0: list):
-        """Set initial parameter guess for Rabi fit: ``[omega, decay, amplitude]``.
-
-        All values must be non-negative.  Pass ``None`` to revert to the
-        automatic heuristic.  Invalidates the cached fit so the next
-        ``.rabi`` access recomputes.
-        """
-        self._rabi_p0 = list(p0) if p0 is not None else None
+    @rabi_p0.setter
+    def rabi_p0(self, value):
+        self._rabi_p0 = list(value) if value is not None else None
         self._rabi_cache = None
 
     # ------------------------------------------------------------------
@@ -709,12 +719,41 @@ class _ScanSubset:
         return self._gauss_cache
 
     @property
+    def gauss_p0(self):
+        """Initial parameter guess for Gaussian fit: ``[A, mu, sigma]``.
+
+        Set to ``None`` to revert to the automatic heuristic.
+        Setting this value invalidates the cached fit.
+        """
+        return self._gauss_p0
+
+    @gauss_p0.setter
+    def gauss_p0(self, value):
+        self._gauss_p0 = list(value) if value is not None else None
+        self._gauss_cache = None
+
+    @property
     def gaussgauss(self):
         if self._gaussgauss_cache is None:
             self._gaussgauss_cache = fit_double_gaussian(
                 self.x, self.y, self.error, p0=self._gaussgauss_p0
             )
         return self._gaussgauss_cache
+
+    @property
+    def gaussgauss_p0(self):
+        """Initial parameter guess for double Gaussian fit:
+        ``[A1, mu1, sigma1, A2, mu2, sigma2]``.
+
+        Set to ``None`` to revert to the automatic heuristic.
+        Setting this value invalidates the cached fit.
+        """
+        return self._gaussgauss_p0
+
+    @gaussgauss_p0.setter
+    def gaussgauss_p0(self, value):
+        self._gaussgauss_p0 = list(value) if value is not None else None
+        self._gaussgauss_cache = None
 
     @property
     def rabi(self):
@@ -724,30 +763,18 @@ class _ScanSubset:
             )
         return self._rabi_cache
 
-    def set_gauss_p0(self, p0: list):
-        """Set initial parameter guess for Gaussian fit: ``[A, mu, sigma]``.
+    @property
+    def rabi_p0(self):
+        """Initial parameter guess for Rabi fit: ``[omega, decay, amplitude]``.
 
-        Pass ``None`` to revert to the automatic heuristic.
+        All values must be non-negative.  Set to ``None`` to revert to the
+        automatic heuristic.  Setting this value invalidates the cached fit.
         """
-        self._gauss_p0 = list(p0) if p0 is not None else None
-        self._gauss_cache = None
+        return self._rabi_p0
 
-    def set_gaussgauss_p0(self, p0: list):
-        """Set initial parameter guess for double Gaussian fit:
-        ``[A1, mu1, sigma1, A2, mu2, sigma2]``.
-
-        Pass ``None`` to revert to the automatic heuristic.
-        """
-        self._gaussgauss_p0 = list(p0) if p0 is not None else None
-        self._gaussgauss_cache = None
-
-    def set_rabi_p0(self, p0: list):
-        """Set initial parameter guess for Rabi fit: ``[omega, decay, amplitude]``.
-
-        All values must be non-negative.  Pass ``None`` to revert to the
-        automatic heuristic.
-        """
-        self._rabi_p0 = list(p0) if p0 is not None else None
+    @rabi_p0.setter
+    def rabi_p0(self, value):
+        self._rabi_p0 = list(value) if value is not None else None
         self._rabi_cache = None
 
     def get_stability(self, customfunction: str = 'a0-a1') -> pd.Series:
