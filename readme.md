@@ -86,6 +86,14 @@ By default, the function `a0 - a1` is used. A custom function can also be used e
 ## Fitting Routines
 Basic fitting routines for fitting oscillatory data and Gaussian peaks are included. The best fit values `p0` and variance matrix `varMatrix` can be accessed through a scan object i.e.
 
+Initial parameter guesses (`p0`) can be seeded via properties: `sc.gauss_p0`, `sc.gaussgauss_p0`, `sc.rabi_p0`. Set to `None` to revert to the automatic heuristic.
+
+```
+>>> sc.gauss_p0 = [0.15, 19.556, 7e-5]
+>>> sc.gauss.p0
+array([0.1416, 19.5564, 6.61e-05])
+```
+
 ### Gaussian
 $$
 A  e^{- \frac{(x-\mu)^2}{2 \sigma^2}}
