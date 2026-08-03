@@ -133,3 +133,76 @@ def test_fit_rabi_shifts_y():
     y = rabi_func(x, 2*np.pi*0.5, 5.0, 1.0) + 0.5  # add offset
     result = fit_rabi(x, y)
     assert len(result.p0) == 3
+
+
+# ---------- p0 (initial guess) tests ---------------------------------------
+
+def test_fit_gaussian_custom_p0():
+    """Passing an explicit p0 should still converge."""
+    x = np.linspace(-5, 5, 200)
+    true_A, true_mu, true_sigma = 3.0, 0.5, 1.2
+    y = gaussian_func(x, true_A, true_mu, true_sigma)
+    np.random.seed(42)
+    y += np.random.normal(0, 0.01, len(y))
+
+    # Use approximate seed values
+    result = fit_gaussian(x, y, p0=[2.5, 0.0, 1.5])
+    assert result.p0[0] == approx(true_A, rel=0.05)
+    assert result.p0[1] == approx(true_mu, abs=0.1)
+    assert result.p0[2] == approx(true_sigma, rel=0.1)
+
+
+def test_fit_gaussian_custom_p0_matches_default():
+    """Custom p0 close to the heuristic should give the same result."""
+    x = np.linspace(-5, 5, 200)
+    y = gaussian_func(x, 3.0, 0.5, 1.2)
+    np.random.seed(42)
+    y += np.random.normal(0, 0.01, len(y))
+
+    result_default = fit_gaussian(x, y)
+    # Seed with the same values the heuristic would pick
+    result_custom = fit_gaussian(x, y, p0=[np.max(y), x[np.argmax(y)], 1.0])
+
+    assert np.allclose(result_default.p0, result_custom.p0, atol=1e-6)
+
+
+def test_fit_double_gaussian_custom_p0():
+    """Passing an explicit p0 to double Gaussian should converge."""
+    x = np.linspace(-6, 6, 300)
+    y = double_gaussian_func(x, 1.0, -2.0, 0.5, 0.7, 2.0, 0.5)
+    np.random.seed(42)
+    y += np.random.normal(0, 0.01, len(y))
+
+    result = fit_double_gaussian(
+        x, y, p0=[0.8, -2.5, 0.6, 0.5, 1.5, 0.6]
+    )
+    assert isinstance(result, FitResult)
+    mus = sorted([result.p0[1], result.p0[4]])
+    assert mus[0] == approx(-2.0, abs=0.5)
+    assert mus[1] == approx(2.0, abs=0.5)
+
+
+def test_fit_rabi_custom_p0():
+    """Passing an explicit p0 to Rabi fit should converge."""
+    x = np.linspace(0, 10, 200)
+    true_omega = 2 * np.pi * 0.5
+    true_decay = 5.0
+    true_amp = 1.0
+    y = rabi_func(x, true_omega, true_decay, true_amp)
+    np.random.seed(42)
+    y += np.random.normal(0, 0.02, len(y))
+
+    # Seed with slightly off values
+    result = fit_rabi(x, y, p0=[2.0, 4.0, 0.8])
+    assert result.p0[0] == approx(true_omega, rel=0.2)
+
+
+def test_fit_gaussian_p0_none_is_default():
+    """Passing p0=None should behave identically to omitting it."""
+    x = np.linspace(-5, 5, 200)
+    y = gaussian_func(x, 3.0, 0.5, 1.2)
+
+    result_implicit = fit_gaussian(x, y)
+    result_explicit = fit_gaussian(x, y, p0=None)
+
+    assert np.allclose(result_implicit.p0, result_explicit.p0)
