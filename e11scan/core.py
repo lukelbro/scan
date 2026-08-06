@@ -303,6 +303,98 @@ def apply_stability_filter(
     return df
 
 
+def _infer_block_length(df: pd.DataFrame):
+    """Infer the loop-block length from repeated v0 measurements.
+
+    Rows are laid out in blocks — each block is one full pass over the
+    v0 values (in the same order within every block).  Consecutive
+    occurrences of the same v0 value are therefore exactly one block
+    apart, so the block length is the *modal* row-gap between consecutive
+    occurrences of the same v0.
+
+    Returns ``None`` if the data shows no loop-block structure, i.e.:
+    - no v0 value is measured more than once (single random pass), or
+    - the modal gap does not dominate (randomized repetitions without
+      consistent blocks).
+    """
+    gaps = []
+    for v0, idx in df.groupby('v0').groups.items():
+        idx = np.asarray(sorted(idx))
+        if len(idx) > 1:
+            gaps.extend(np.diff(idx).tolist())
+
+    if not gaps:
+        return None
+
+    gaps = np.asarray(gaps, dtype=float)
+    vals, counts = np.unique(gaps, return_counts=True)
+    mode = vals[np.argmax(counts)]
+
+    # Block structure is only trustworthy if the modal gap dominates.
+    # In randomized (non-looped) data no single gap wins.
+    if counts.max() / len(gaps) < 0.5:
+        return None
+    return int(mode)
+
+
+def apply_loop_drop(
+    df: pd.DataFrame,
+    loops,
+    numloops: int = None,
+    block_length: int = None,
+) -> pd.DataFrame:
+    """Drop rows belonging to the given loop indices.
+
+    Loop index for a row is ``(row_position // block_length) % numloops``,
+    where ``block_length`` is the number of rows in one full pass over v0.
+    If ``block_length`` is not supplied it is inferred from the data (see
+    ``_infer_block_length``).
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Data with a ``v0`` column.
+    loops : iterable or None
+        Loop indices (0-based) to drop.  ``None`` or empty keeps all rows.
+    numloops : int, optional
+        Total number of loops (``v0_loops`` metadata).  Used to wrap the
+        block index for v1-major 2D frames.
+    block_length : int, optional
+        Explicit block length.  Bypasses the "not looped" check.
+
+    Returns
+    -------
+    pd.DataFrame
+        Copy of ``df`` with the requested loops' rows removed.
+
+    Raises
+    ------
+    ValueError
+        If loops are requested but the data shows no loop-block structure
+        (e.g. a truly randomized measurement) and no ``block_length`` was
+        supplied.
+    """
+    df = df.copy()
+    if loops is None or len(loops) == 0:
+        return df
+
+    if block_length is None:
+        block_length = _infer_block_length(df)
+    if block_length is None:
+        raise ValueError(
+            'Cannot drop loops: data does not appear to be looped. '
+            'No repeated v0 measurement was found (or no consistent '
+            'loop-block structure). Pass block_length explicitly to '
+            'override.'
+        )
+
+    block = np.arange(len(df)) // block_length
+    loop_idx = block % numloops if numloops else block
+    drop = set(np.atleast_1d(loops))
+    keep = ~pd.Series(loop_idx).isin(drop).values
+    return df[keep]
+
+
 # ---------------------------------------------------------------------------
 # Window Recomputation
 # ---------------------------------------------------------------------------

@@ -2,6 +2,7 @@ from .context import e11scan
 import numpy as np
 from pytest import approx, raises
 import pandas as pd
+from e11scan.core import apply_loop_drop, _infer_block_length
 
 def test_scan_baseValue():
     # Generate analysis data using Scan object
@@ -653,4 +654,203 @@ def test_rabi_p0_property_settable():
 
     sc.rabi_p0 = None
     assert sc.rabi_p0 is None
+
+
+# ------------------------------------------------------------------
+# drop_loops — core unit tests (synthetic data)
+# ------------------------------------------------------------------
+
+def _looped_df(num_v0=50, num_loops=3, truncate_last=None, seed=42):
+    """Build a synthetic looped DataFrame (loop-major blocks)."""
+    rng = np.random.default_rng(seed)
+    v0_order = rng.permutation(np.linspace(0, num_v0 - 1, num_v0))
+    rows = []
+    for loop in range(num_loops):
+        for i, v in enumerate(v0_order):
+            if truncate_last is not None and loop == num_loops - 1 and i >= truncate_last:
+                break
+            rows.append(v)
+    return pd.DataFrame({'v0': rows, 'signal': np.arange(len(rows), dtype=float)})
+
+
+def test_apply_loop_drop_loop_major_blocks():
+    """Dropping loop k removes the k-th block of rows."""
+    df = _looped_df(num_v0=50, num_loops=3)
+    assert len(df) == 150
+
+    out = apply_loop_drop(df, [1], numloops=3)
+    assert len(out) == 100
+    # Loop 1 = rows 50..99
+    assert set(range(50, 100)).isdisjoint(out.index)
+    assert set(range(0, 50)).issubset(out.index)
+    assert set(range(100, 150)).issubset(out.index)
+
+
+def test_apply_loop_drop_truncated_last_block():
+    """A measurement ended mid-loop: the partial last block is still loop 2."""
+    df = _looped_df(num_v0=50, num_loops=3, truncate_last=30)
+    assert len(df) == 130  # 50 + 50 + 30
+
+    # Block length must still be inferred as 50 despite the truncation
+    assert _infer_block_length(df) == 50
+
+    out = apply_loop_drop(df, [2], numloops=3)
+    assert len(out) == 100  # the 30 partial rows removed
+    assert set(range(100, 130)).isdisjoint(out.index)
+
+
+def test_apply_loop_drop_multiple_and_out_of_range():
+    """Dropping multiple loops and out-of-range loops."""
+    df = _looped_df(num_v0=50, num_loops=3)
+
+    out = apply_loop_drop(df, [0, 1], numloops=3)
+    assert len(out) == 50
+
+    # Out-of-range loop is a no-op
+    out = apply_loop_drop(df, [5], numloops=3)
+    assert len(out) == 150
+
+    # Dropping everything
+    out = apply_loop_drop(df, [0, 1, 2], numloops=3)
+    assert len(out) == 0
+
+
+def test_apply_loop_drop_empty_or_none():
+    """Empty/None loops keep all rows (no error)."""
+    df = _looped_df(num_v0=50, num_loops=3)
+    assert len(apply_loop_drop(df, None)) == 150
+    assert len(apply_loop_drop(df, [])) == 150
+
+
+def test_apply_loop_drop_v1_major_wrap():
+    """2D layout: blocks ordered v1-major, loop-minor; numloops wraps."""
+    # Two v1 values, each with 3 loops of 50 rows
+    rng = np.random.default_rng(7)
+    v0_order = rng.permutation(np.linspace(0, 49, 50))
+    rows = []
+    for v1 in (0.0, 1.0):
+        for loop in range(3):
+            for v in v0_order:
+                rows.append((v, v1))
+    df = pd.DataFrame({'v0': [r[0] for r in rows], 'v1': [r[1] for r in rows]})
+    assert len(df) == 300
+
+    # Loop 1 of each v1: blocks 1 and 4
+    out = apply_loop_drop(df, [1], numloops=3)
+    assert len(out) == 200
+    # Removed block 1 (rows 50..99) and block 4 (rows 200..249)
+    assert set(range(50, 100)).isdisjoint(out.index)
+    assert set(range(200, 250)).isdisjoint(out.index)
+    assert len(out[out['v1'] == 0.0]) == 100
+    assert len(out[out['v1'] == 1.0]) == 100
+
+
+def test_apply_loop_drop_raises_when_not_looped():
+    """Truly randomized single pass (no repeats) must raise ValueError."""
+    rng = np.random.default_rng(42)
+    df = pd.DataFrame({'v0': rng.permutation(np.linspace(0, 99, 100))})
+    assert _infer_block_length(df) is None
+    with raises(ValueError):
+        apply_loop_drop(df, [0])
+
+
+def test_apply_loop_drop_raises_randomized_repetitions():
+    """Randomized repetitions without block structure must raise ValueError."""
+    rng = np.random.default_rng(42)
+    df = pd.DataFrame({'v0': rng.integers(0, 50, size=300)})
+    assert _infer_block_length(df) is None
+    with raises(ValueError):
+        apply_loop_drop(df, [0])
+
+
+def test_apply_loop_drop_block_length_override_bypasses_check():
+    """Explicit block_length bypasses the not-looped check."""
+    rng = np.random.default_rng(42)
+    df = pd.DataFrame({'v0': rng.permutation(np.linspace(0, 99, 100))})
+    # Override with a block length — should not raise.
+    # block_length=50, numloops=2 → rows 0..49 are loop 0, 50..99 are loop 1.
+    out = apply_loop_drop(df, [0], block_length=50, numloops=2)
+    assert len(out) == 50
+
+
+def test_apply_loop_drop_not_looped_empty_loops_no_error():
+    """On non-looped data, empty/None loops do not raise."""
+    rng = np.random.default_rng(42)
+    df = pd.DataFrame({'v0': rng.permutation(np.linspace(0, 99, 100))})
+    assert len(apply_loop_drop(df, None)) == 100
+    assert len(apply_loop_drop(df, [])) == 100
+
+
+# ------------------------------------------------------------------
+# drop_loops — Scan API tests (real data, deterministic block structure)
+# ------------------------------------------------------------------
+
+def test_drop_loops_reversibility():
+    """drop_loops([1]) then drop_loops(None) restores the full dataset."""
+    sc = _load_scan()
+    original_len = len(sc.df)
+    assert original_len == 330  # 005: blocks 126 + 126 + 78
+
+    sc.drop_loops([1])
+    assert len(sc.df) == 204  # 330 - 126
+
+    sc.drop_loops(None)
+    assert len(sc.df) == original_len
+
+
+def test_drop_loops_truncated_loop_exact_counts():
+    """Exact row counts for the truncated last loop in file 005."""
+    sc = _load_scan()
+
+    sc.drop_loops([2])       # truncated loop: 78 rows
+    assert len(sc.df) == 252  # 330 - 78
+
+    sc.drop_loops(None)
+    sc.drop_loops([0, 1])    # keep only the truncated loop's rows
+    assert len(sc.df) == 78
+
+
+def test_drop_loops_out_of_range_noop():
+    """Out-of-range loop index is a no-op."""
+    sc = _load_scan()
+    sc.drop_loops([5])
+    assert len(sc.df) == 330
+
+
+def test_drop_loops_affects_average():
+    """Dropping a loop changes the averaged y."""
+    sc = _load_scan()
+    y_all = sc.y.copy()
+
+    sc.drop_loops([2])  # drop the incomplete loop
+    assert not np.allclose(sc.y, y_all)
+
+
+def test_drop_loops_pipeline_step():
+    """drop_loops works through set_pipeline and add_step."""
+    sc = _load_scan()
+    sc.set_pipeline([('drop_loops', [1])])
+    assert len(sc.df) == 204
+    assert ('drop_loops', {'loops': [1], 'numloops': 3}) in sc.pipeline
+
+    sc2 = _load_scan()
+    sc2.add_step('drop_loops', [2])
+    assert len(sc2.df) == 252
+
+
+def test_drop_loops_on_scan_subset():
+    """drop_loops works on a _ScanSubset (via ScanMD)."""
+    scs = e11scan.scanmd(
+        filename='tests/20221208_006_scan.h5',
+        function='a0-a1', experiment='microwave',
+    )
+    subset = scs.sets[0]  # v1=-0.03, blocks of 134 (3 loops)
+    original = len(subset.df)
+    assert original == 402  # 3 * 134
+
+    subset.drop_loops([1])
+    assert len(subset.df) == 268  # 402 - 134
+
+    subset.drop_loops(None)
+    assert len(subset.df) == original
 

@@ -205,6 +205,7 @@ Filters are configured as an ordered list of steps stored in `sc.pipeline`. Each
 | `filter_rows` | Keeps only a contiguous range of rows (start, end) |
 | `basic_filter` | Removes outlier data points using a relative spacing threshold |
 | `remove_unstable` | Removes measurements where a stability metric exceeds a threshold |
+| `drop_loops` | Removes specific measurement loops |
 
 ### Setting a pipeline
 
@@ -280,6 +281,13 @@ Because the pipeline order is user-controlled, you can easily compare the effect
 **`basic_filter`** — Takes a float `m`. For each measurement group, if the gap between the first two sorted signal values exceeds `m` times the gap between the second and third, the extreme point is dropped. A typical value is `1.5`.
 
 **`remove_unstable`** — Takes a float `threshold` and an optional `customfunction` string (default `'a0-a1'`). Any measurement where the evaluated function exceeds the threshold is removed. Useful for filtering out drift or instability in the experiment.
+
+**`drop_loops`** — Takes a list of loop indices. Useful for discarding a bad repeat scan or an incomplete final loop (e.g. a measurement stopped mid-loop). `drop_loops(None)` restores all loops. Raises `ValueError` if the data does not appear to be looped (e.g. a single randomized pass).
+
+```
+>>> sc.drop_loops([2])        # drop the (possibly incomplete) third loop
+>>> sc.drop_loops(None)       # restore all loops
+```
 
 ### Working with osc_1 traces
 

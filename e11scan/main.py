@@ -20,6 +20,7 @@ from .core import (
     process_signal,
     apply_basic_filter,
     apply_stability_filter,
+    apply_loop_drop,
     recompute_windows,
 )
 from .fitting import fit_gaussian, fit_double_gaussian, fit_rabi
@@ -33,6 +34,9 @@ _PIPELINE_STEPS = {
     'basic_filter': lambda df, m: apply_basic_filter(df, m),
     'remove_unstable': lambda df, threshold, customfunction='a0-a1': (
         apply_stability_filter(df, threshold, customfunction)
+    ),
+    'drop_loops': lambda df, loops, **kwargs: apply_loop_drop(
+        df, loops, **kwargs
     ),
 }
 
@@ -296,12 +300,17 @@ class Scan:
         'filter_rows': ['rows'],
         'basic_filter': ['m'],
         'remove_unstable': ['threshold', 'customfunction'],
+        'drop_loops': ['loops'],
     }
 
     def _resolve_step_args(self, name, args, kwargs) -> dict:
         """Map positional convenience args onto the handler's kwarg names."""
         resolved = dict(zip(self._STEP_ARG_NAMES[name], args))
         resolved.update(kwargs)
+        # drop_loops needs numloops so the block index wraps correctly for
+        # v1-major 2D frames; inject it when not supplied explicitly.
+        if name == 'drop_loops' and 'numloops' not in resolved:
+            resolved['numloops'] = self.numloops
         return resolved
 
     def _normalize_step(self, name, args):
@@ -437,6 +446,32 @@ class Scan:
         self._replace_or_remove_step(
             'remove_unstable', threshold, arg_name='threshold',
             extra_kwargs={'customfunction': customfunction},
+        )
+
+    def drop_loops(self, loops: Optional[list]):
+        """Drop (or restore) specific measurement loops.
+
+        Measurement loops are 0-based passes over all v0 points
+        (``0 .. v0_loops-1``).  Rows belonging to the given loops are
+        removed before averaging.
+
+        Parameters
+        ----------
+        loops : list of int or None
+            Loop indices to drop.  ``None`` disables the drop and
+            restores all loops.
+
+        Raises
+        ------
+        ValueError
+            If the data does not appear to be looped (e.g. a single
+            randomized pass) — see ``apply_loop_drop``.
+        """
+        self._replace_or_remove_step(
+            'drop_loops',
+            list(loops) if loops is not None else None,
+            arg_name='loops',
+            extra_kwargs={'numloops': self.numloops},
         )
 
     # ------------------------------------------------------------------
@@ -801,11 +836,16 @@ class _ScanSubset:
         'filter_rows': ['rows'],
         'basic_filter': ['m'],
         'remove_unstable': ['threshold', 'customfunction'],
+        'drop_loops': ['loops'],
     }
 
     def _resolve_step_args(self, name, args, kwargs) -> dict:
         resolved = dict(zip(self._STEP_ARG_NAMES[name], args))
         resolved.update(kwargs)
+        # drop_loops needs numloops so the block index wraps correctly for
+        # v1-major 2D frames; inject it when not supplied explicitly.
+        if name == 'drop_loops' and 'numloops' not in resolved:
+            resolved['numloops'] = self.numloops
         return resolved
 
     def _normalize_step(self, name, args):
@@ -891,4 +931,30 @@ class _ScanSubset:
         self._replace_or_remove_step(
             'remove_unstable', threshold, arg_name='threshold',
             extra_kwargs={'customfunction': customfunction},
+        )
+
+    def drop_loops(self, loops: Optional[list]):
+        """Drop (or restore) specific measurement loops.
+
+        Measurement loops are 0-based passes over all v0 points
+        (``0 .. v0_loops-1``).  Rows belonging to the given loops are
+        removed before averaging.
+
+        Parameters
+        ----------
+        loops : list of int or None
+            Loop indices to drop.  ``None`` disables the drop and
+            restores all loops.
+
+        Raises
+        ------
+        ValueError
+            If the data does not appear to be looped — see
+            ``apply_loop_drop``.
+        """
+        self._replace_or_remove_step(
+            'drop_loops',
+            list(loops) if loops is not None else None,
+            arg_name='loops',
+            extra_kwargs={'numloops': self.numloops},
         )
